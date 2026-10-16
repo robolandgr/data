@@ -1,4 +1,8 @@
-streamlit
-pandas
-gspread
+streamlit>=1.40.0
+pandas>=2.0.0
+numpy
+gspread>=6.0.0
 google-auth
+reportlab
+protobuf
+openpyxl
