@@ -177,33 +177,31 @@ if not st.session_state.logged_in:
     if submit_login:
         try:
             gc = get_gspread_client()
-            df_main = load_specific_db("db_users")
-            sh_second = gc.open_by_key(NEW_SHEET_ID).worksheet("db_users")
-            records_second = sh_second.get_all_records()
-            df_second = pd.DataFrame(records_second) if records_second else pd.DataFrame()
+            ws_users = gc.open(OLD_SHEET_NAME).worksheet("db_users")
+            users_records = ws_users.get_all_records()
             
-            if not df_main.empty and not df_second.empty:
-                df_main.columns = df_main.columns.astype(str).str.strip()
-                df_second.columns = df_second.columns.astype(str).str.strip()
-                users_df = pd.concat([df_main, df_second], ignore_index=True).drop_duplicates()
-            elif not df_main.empty:
-                users_df = df_main
+            if users_records:
+                users_df = pd.DataFrame(users_records)
+                users_df.columns = users_df.columns.astype(str).str.strip()
+                # Καθαρισμός κενών από τα κλειδιά
+                users_df['username'] = users_df['username'].astype(str).str.strip()
+                users_df['password'] = users_df['password'].astype(str).str.strip()
+                users_df['role'] = users_df['role'].astype(str).str.strip().str.lower()
+                
+                user_row = users_df[(users_df['username'] == username_input) & (users_df['password'] == password_input)]
+                
+                if not user_row.empty:
+                    st.session_state.logged_in = True
+                    st.session_state.username = username_input
+                    st.session_state.role = user_row.iloc[0]['role']
+                    st.session_state.page = "menu"
+                    st.rerun()  
+                else:
+                    st.error("❌ Λάθος όνομα χρήστη ή κωδικός πρόσβασης.")
             else:
-                users_df = df_second
-
-            users_df = users_df.astype(str).apply(lambda x: x.str.strip())
-            user_row = users_df[(users_df['username'] == username_input) & (users_df['password'] == password_input)]
-            
-            if not user_row.empty:
-                st.session_state.logged_in = True
-                st.session_state.username = username_input
-                st.session_state.role = user_row.iloc[0]['role'].lower()
-                st.session_state.page = "menu"
-                st.rerun()  
-            else:
-                st.error("❌ Λάθος στοιχεία σύνδεσης.")
+                st.error("❌ Το φύλλο db_users είναι κενό.")
         except Exception as e:
-            st.error(f"Σφάλμα σύνδεσης: {e}")       
+            st.error(f"Σφάλμα σύνδεσης με τη βάση χρηστών: {e}")       
 
 # ==================== MAIN APPLICATION ====================
 else:
