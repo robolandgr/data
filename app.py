@@ -512,6 +512,7 @@ else:
             st.info("Δεν βρέθηκαν δεδομένα παρουσιών.")
         else:
             att_df.columns = att_df.columns.astype(str).str.strip()
+            # Ασφαλής εντοπισμός στήλης status (case-insensitive)
             status_col = next((c for c in att_df.columns if c.lower() == 'status'), None)
             if not status_col:
                 st.error("Δεν βρέθηκε η στήλη 'status' στο φύλλο db_attendances.")
