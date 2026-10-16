@@ -92,7 +92,7 @@ def check_and_update_status_to_finish(c_id, school_year, program):
         raw_data = sh.get_all_records()
         df = pd.DataFrame(raw_data)
         df.columns = df.columns.astype(str).str.strip()
-        mask = (df['id_customer'].astype(str) == str(c_id)) & (df['school_year'].astype(str) == str(school_year)) & (df['program'].astype(str) == str(program))
+        mask = (df['id_customer'].astype(str) == str(c_id)) & (df['school_year'].astype(str) == str(school_year)) & (df.iloc[:, 9].astype(str) == str(program))
         target_indices = df[mask].index.tolist()
         if not target_indices: return
 
@@ -105,7 +105,7 @@ def check_and_update_status_to_finish(c_id, school_year, program):
             pays_sh = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
             pays_df = pd.DataFrame(pays_sh.get_all_records())
             pays_df.columns = pays_df.columns.astype(str).str.strip()
-            mask_pay = (pays_df['id_customer'].astype(str) == str(c_id)) & (pays_df['school_year'].astype(str) == str(school_year)) & (pays_df['program'].astype(str) == str(program))
+            mask_pay = (pays_df['id_customer'].astype(str) == str(c_id)) & (pays_df['school_year'].astype(str) == str(school_year)) & (pays_df.iloc[:, 9].astype(str) == str(program))
             paid = pd.to_numeric(pays_df.loc[mask_pay, 'amount_paid'], errors='coerce').sum()
             balance = total_cost - paid
 
@@ -284,17 +284,17 @@ else:
         st.subheader("Παρουσιολόγιο & Πληρωμές")
         col_pr1, col_pr2 = st.columns(2)
         with col_pr1:
-            if st.button("✅ Παρουσιολόγιο", use_container_width=True):
+            if st.button("✅ Παρουσιολόγιο (Τμήμα Ιδιωτικά)", use_container_width=True):
                 st.session_state.page = "attendances_page"; st.rerun()
         with col_pr2:
-            if st.button("💳 Καταχώρηση Πληρωμής", use_container_width=True):
+            if st.button("💳 Καταχώρηση Πληρωμής (Συνδρομή)", use_container_width=True):
                 st.session_state.page = "add_payment"; st.rerun()
 
         st.markdown("---")
         st.subheader("Οικονομικά & Έξοδα")
         col_p1, col_p2 = st.columns(2)
         with col_p1:
-            if st.button("📊 Οικονομική Αναφορά", use_container_width=True):
+            if st.button("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή", use_container_width=True):
                 st.session_state.page = "payment_history_report"; st.rerun()
         with col_p2:
             if st.button("💸 Καταχώρηση Εξόδων", use_container_width=True):
@@ -362,7 +362,9 @@ else:
                         c_id = str(r['id_customer']).strip()
                         fname = str(r['customer_firstname']).strip()
                         lname = str(r['customer_lastname']).strip()
-                        prog_name = str(r.get('program', '')).strip()
+                        
+                        # Το πρόγραμμα βρίσκεται στη στήλη J (index 9) του db_registrations
+                        prog_name = str(r.iloc[9] if len(r) > 9 else r.get('program', '')).strip()
                         energy_type = str(r.get('energy', 'Ανοιχτή πληρωμή')).strip()
                         
                         cust_match = cust_df[cust_df['id_customer'] == pd.to_numeric(c_id, errors='coerce')]
@@ -376,10 +378,11 @@ else:
                         last_pay_date = None
                         if not pays_df.empty:
                             pays_df.columns = pays_df.columns.astype(str).str.strip()
+                            # Το πρόγραμμα στο db_payments βρίσκεται επίσης στη στήλη J (index 9)
                             cust_pays = pays_df[
                                 (pays_df['id_customer'].astype(str).str.strip() == c_id) &
                                 (pays_df['school_year'].astype(str).str.strip() == selected_year_att) &
-                                (pays_df['program'].astype(str).str.strip().lower() == prog_name.lower())
+                                (pays_df.iloc[:, 9].astype(str).str.strip().lower() == prog_name.lower())
                             ]
                             if not cust_pays.empty and 'payment_date' in cust_pays.columns:
                                 cust_pays['dt'] = pd.to_datetime(cust_pays['payment_date'], errors='coerce')
@@ -512,7 +515,6 @@ else:
             st.info("Δεν βρέθηκαν δεδομένα παρουσιών.")
         else:
             att_df.columns = att_df.columns.astype(str).str.strip()
-            # Ασφαλής εντοπισμός στήλης status (case-insensitive)
             status_col = next((c for c in att_df.columns if c.lower() == 'status'), None)
             if not status_col:
                 st.error("Δεν βρέθηκε η στήλη 'status' στο φύλλο db_attendances.")
@@ -580,8 +582,10 @@ else:
                 mode = st.radio("Ενέργεια", ["Νέα Εγγραφή", "Τροποποίηση"] if not user_regs.empty else ["Νέα Εγγραφή"])
                 reg_to_edit = None
                 
+                prog_col_name = next((c for c in regs_df.columns if c.lower() in ['program', 'δ', 'j', 'πρόγραμμα']), 'program')
+                
                 if mode == "Τροποποίηση" and not user_regs.empty:
-                    user_regs['display_reg'] = user_regs['school_year'].astype(str) + " - " + user_regs['program'].astype(str) + " (" + user_regs['class'].astype(str) + ")"
+                    user_regs['display_reg'] = user_regs['school_year'].astype(str) + " - " + user_regs[prog_col_name].astype(str) + " (" + user_regs['class'].astype(str) + ")"
                     sel_reg = st.selectbox("Επιλογή εγγραφής", user_regs['display_reg'].tolist())
                     reg_to_edit = user_regs[user_regs['display_reg'] == sel_reg].iloc[0]
                 
@@ -683,81 +687,33 @@ else:
         reg_df = load_specific_db("db_registrations")
         if not reg_df.empty: st.dataframe(reg_df, use_container_width=True, hide_index=True)
 
-    # --- ΣΕΛΙΔΑ: ΠΛΗΡΩΜΕΣ ---
     elif st.session_state.page == "add_payment":
-        if st.button("⬅️ Μενού", use_container_width=True): 
-            st.session_state.page = "menu"; st.rerun() 
-            
+        if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
         st.subheader("Καταχώρηση Πληρωμής Συνδρομής")
         cust_df = load_specific_db("db_customers")
         reg_df = load_specific_db("db_registrations")
-        pays_df = load_specific_db("db_payments")
-        
         if not cust_df.empty:
             cust_df['display'] = cust_df['customer_lastname'].astype(str) + " " + cust_df['customer_firstname'].astype(str) + " (ID: " + cust_df['id_customer'].astype(str) + ")"
-            sel_cust = st.selectbox("🔍 Επιλογή Πελάτη", options=["-- Επιλέξτε --"] + cust_df['display'].tolist())
-            
-            if sel_cust != "-- Επιλέξτε --":
-                row = cust_df[cust_df['display'] == sel_cust].iloc[0]
+            sel = st.selectbox("Πελάτης", options=["-- Επιλέξτε --"] + cust_df['display'].tolist())
+            if sel != "-- Επιλέξτε --":
+                row = cust_df[cust_df['display'] == sel].iloc[0]
                 c_id = int(row['id_customer'])
-                
                 user_regs = reg_df[reg_df['id_customer'].astype(str).str.strip() == str(c_id)]
-                if user_regs.empty:
-                    st.error("⚠️ Ο πελάτης δεν έχει ενεργή εγγραφή σε πρόγραμμα.")
-                else:
-                    sel_y = st.selectbox("📅 Έτος:", options=user_regs['school_year'].unique().tolist())
-                    sel_prog = st.selectbox("📚 Πρόγραμμα:", options=user_regs['program'].unique().tolist())
-                    
-                    # --- ΥΠΟΛΟΓΙΣΜΟΣ ΥΠΟΛΟΙΠΟΥ (ΧΡΕΩΣΗ - ΠΛΗΡΩΜΕΝΑ) ---
-                    current_reg_row = user_regs[(user_regs['school_year'].astype(str) == str(sel_y)) & (user_regs['program'].astype(str) == str(sel_prog))]
-                    total_cost = 0.0
-                    if not current_reg_row.empty:
-                        adj_val = current_reg_row.iloc[0].get('adjusted_cost', 0)
-                        try:
-                            total_cost = float(str(adj_val).replace(',', '.') or 0.0)
-                        except:
-                            total_cost = 0.0
-
-                    paid_amount = 0.0
-                    if not pays_df.empty:
-                        pays_df.columns = pays_df.columns.astype(str).str.strip()
-                        mask_p = (
-                            (pays_df['id_customer'].astype(str).str.strip() == str(c_id)) &
-                            (pays_df['school_year'].astype(str).str.strip() == str(sel_y)) &
-                            (pays_df['program'].astype(str).str.strip().lower() == str(sel_prog).lower())
-                        )
-                        paid_amount = pd.to_numeric(pays_df.loc[mask_p, 'amount_paid'], errors='coerce').sum()
-
-                    remaining_balance = total_cost - paid_amount
-
-                    # Εμφάνιση καρτέλας υπολοίπου
-                    st.info(f"💰 **Συμφωνηθέν ποσό:** {total_cost:.2f}€ | 💸 **Έχει πληρώσει:** {paid_amount:.2f}€ | 📉 **Υπόλοιπο:** {remaining_balance:.2f}€")
-
-                    with st.form("pay"):
-                        rec = st.text_input("Αρ. Απόδειξης").strip()
-                        amt = st.number_input("Ποσό (€)", min_value=0.0, format="%.2f")
-                        pay_method = st.selectbox("Τρόπος", ["Μετρητά", "Εθνική", "Eurobank", "POS"])
-                        
-                        if st.form_submit_button("💾 Αποθήκευση"):
-                            if not rec or amt <= 0:
-                                st.warning("⚠️ Συμπληρώστε απόδειξη και ποσό!")
-                            else:
-                                try:
-                                    gc = get_gspread_client()
-                                    sh = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
-                                    records = sh.get_all_records()
-                                    next_id = int(pd.DataFrame(records)['id_payment'].max()) + 1 if records and 'id_payment' in pd.DataFrame(records).columns else 1
-                                    
-                                    sh.append_row([
-                                        next_id, c_id, str(row['customer_lastname']), str(row['customer_firstname']),
-                                        datetime.today().strftime('%Y-%m-%d'), rec, amt, str(sel_y), pay_method, str(sel_prog)
-                                    ])
-                                    check_and_update_status_to_finish(c_id, sel_y, sel_prog)
-                                    st.success("✅ Η πληρωμή καταχωρήθηκε!")
-                                    time.sleep(1.2)
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Σφάλμα: {e}")
+                prog_col_name = next((c for c in user_regs.columns if c.lower() in ['program', 'δ', 'j', 'πρόγραμμα']), 'program')
+                with st.form("pay"):
+                    rec = st.text_input("Αρ. Απόδειξης")
+                    amt = st.number_input("Ποσό (€)", min_value=0.0)
+                    yr = st.selectbox("Έτος", user_regs['school_year'].unique().tolist() if not user_regs.empty else ["2026-2027"])
+                    prog = st.selectbox("Πρόγραμμα", user_regs[prog_col_name].unique().tolist() if not user_regs.empty else ["ROBOLAND"])
+                    if st.form_submit_button("💾 Αποθήκευση"):
+                        gc = get_gspread_client()
+                        sh = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
+                        recs = sh.get_all_records()
+                        nid = int(pd.DataFrame(recs)['id_payment'].max()) + 1 if recs and 'id_payment' in pd.DataFrame(recs).columns else 1
+                        sh.append_row([nid, c_id, row['customer_lastname'], row['customer_firstname'], datetime.today().strftime('%Y-%m-%d'), rec, amt, yr, "Μετρητά", prog])
+                        check_and_update_status_to_finish(c_id, yr, prog)
+                        st.success("✅ Καταχωρήθηκε!")
+                        st.rerun()
 
     elif st.session_state.page == "payment_history_report":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun()
@@ -777,7 +733,7 @@ else:
                 sh = gc.open(OLD_SHEET_NAME).worksheet("db_payments_company")
                 recs = sh.get_all_records()
                 nid = int(pd.DataFrame(recs)['id'].max()) + 1 if recs and 'id' in pd.DataFrame(recs).columns else 1
-                sh.append_row([nid, inv, "Έξοδα", "", sup, "2026-2027", datetime.today().strftime('%Y-%m-%d'), datetime.today().strftime('%Y-%m-%d'), datetime.today().strftime('%Y-%m-%d'), amt, "Μετρητά"])
+                sh.append_row([nid, inv, "Έξοδα", "", sup, "2026-2027", datetime.today().strftime('%Y-%m-%d'), datetime.today().strftime('%Y-%m-%d'), datetime.today().strftime('%Y-%m-%d'], amt, "Μετρητά"])
                 st.success("✅ Το έξοδο αποθηκεύτηκε!")
                 st.rerun()
 
@@ -789,46 +745,14 @@ else:
         st.dataframe(p_df, use_container_width=True)
         st.dataframe(c_df, use_container_width=True)
 
-    # --- ΣΕΛΙΔΑ: ΜΗΤΡΩΟ ΠΕΛΑΤΩΝ ---
     elif st.session_state.page == "anafora_pelaton":
-        if st.button("⬅️ Μενού", use_container_width=True):
-            st.session_state.page = "menu"; st.rerun() 
-        
-        st.subheader("📋 Μητρώο Πελατών & Εγγραφών")
-        reg_df = load_specific_db("db_registrations")
-        
-        if not reg_df.empty:
-            reg_df.columns = reg_df.columns.astype(str).str.strip()
-            
-            # --- ΦΙΛΤΡΑ ΑΝΑΖΗΤΗΣΗΣ ---
-            col_f1, col_f2 = st.columns(2)
-            
-            # 1. Φίλτρο Σχολικού Έτους (school_year)
-            available_years = ["ΟΛΑ"] + sorted(reg_df['school_year'].dropna().astype(str).unique().tolist(), reverse=True)
-            sel_year_filter = col_f1.selectbox("📅 Φίλτρο ανά Σχολικό Έτος", options=available_years, key="anafora_year_filter")
-            
-            # 2. Φίλτρο Τμήματος (class) - π.χ. Voucher, Ιδιωτικά κλπ.
-            available_classes = ["ΟΛΑ"] + sorted(reg_df['class'].dropna().astype(str).unique().tolist())
-            sel_class_filter = col_f2.selectbox("🏫 Φίλτρο ανά Τμήμα (Class)", options=available_classes, key="anafora_class_filter")
-            
-            # Εφαρμογή φίλτρων στο DataFrame
-            filtered_reg = reg_df.copy()
-            if sel_year_filter != "ΟΛΑ":
-                filtered_reg = filtered_reg[filtered_reg['school_year'].astype(str).str.strip() == sel_year_filter]
-            if sel_class_filter != "ΟΛΑ":
-                filtered_reg = filtered_reg[filtered_reg['class'].astype(str).str.strip().str.lower() == sel_class_filter.strip().lower()]
+        if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
+        st.subheader("Μητρώο Πελατών")
+        reg = load_specific_db("db_registrations")
+        if not reg.empty: st.dataframe(reg, use_container_width=True)
 
-            st.markdown(f"**Βρέθηκαν εγγραφές:** {len(filtered_reg)}")
-            st.dataframe(filtered_reg, use_container_width=True, hide_index=True)
-            
-            if not filtered_reg.empty:
-                st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("📥 Παραγωγή PDF Μητρώου"):
-                    rep_pdf = generate_report_pdf_customers(filtered_reg, selected_year=sel_year_filter)
-                    if rep_pdf:
-                        st.download_button("📥 Κατεβάστε το αρχείο PDF", data=rep_pdf, file_name="mitroo_pelaton.pdf", mime="application/pdf")
-        else:
-            st.info("Δεν βρέθηκαν εγγραφές στη βάση `db_registrations`.")
+    elif st.session_state.page + "unassigned_customers": # placeholder check
+        pass
 
     elif st.session_state.page == "unassigned_customers":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun()
