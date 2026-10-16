@@ -262,7 +262,7 @@ else:
                 st.session_state.page = "add_payment"; st.rerun()
 
         st.markdown("---")
-        st.subheader("Οικονομικά & Εξοδα")
+        st.subheader("Οικονομικά & Έξοδα")
         col_p1, col_p2 = st.columns(2)
         with col_p1:
             if st.button("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή", use_container_width=True):
@@ -300,20 +300,22 @@ else:
         st.info(f"📅 Ημερομηνία Ημέρας: **{today_date_str}**")
 
         regs_df = load_specific_db("db_registrations")
-        if regs_df.empty:
-            st.warning("Δεν βρέθηκαν εγγραφές.")
+        cust_df = load_specific_db("db_customers")
+
+        if regs_df.empty or cust_df.empty:
+            st.warning("Δεν βρέθηκαν δεδομένα εγγραφών ή πελατών.")
         else:
             regs_df.columns = regs_df.columns.astype(str).str.strip()
+            cust_df.columns = cust_df.columns.astype(str).str.strip()
+            cust_df['id_customer'] = pd.to_numeric(cust_df['id_customer'], errors='coerce')
+
             # Φιλτράρισμα για τμήμα 'Ιδιωτικά' και επιλεγμένο έτος
             priv_regs = regs_df[(regs_df['class'].astype(str).str.strip().str.lower() == 'ιδιωτικά') & (regs_df['school_year'].astype(str).str.strip() == selected_year_att)].copy()
 
             if priv_regs.empty:
                 st.info(f"Δεν βρέθηκαν μαθητές στο τμήμα 'Ιδιωτικά' για το έτος {selected_year_att}.")
             else:
-                # Φόρτωση προγραμμάτων για να ξέρουμε την αρχική τιμή αν χρειαστεί
-                progs_df = load_specific_db("db_programs")
-                
-                # Φόρτωση υπαρχουσών παρουσιών για σημερα
+                # Φόρτωση υπαρχουσών παρουσιών για σήμερα
                 att_df = load_specific_db("db_attendances")
                 today_att = pd.DataFrame()
                 if not att_df.empty and 'date' in att_df.columns:
@@ -329,6 +331,18 @@ else:
                         lname = str(r['customer_lastname']).strip()
                         energy_type = str(r.get('energy', 'Ανοιχτή πληρωμή')).strip()
                         
+                        # Αναζήτηση κόστους από τη στήλη K (ή αντίστοιχη) του db_customers
+                        cust_match = cust_df[cust_df['id_customer'] == pd.to_numeric(c_id, errors='coerce')]
+                        cust_cost = 5.0 # προεπιλογή
+                        if not cust_match.empty:
+                            # Η στήλη K είναι η 11η στήλη (index 10) στο db_customers
+                            if len(cust_match.columns) >= 11:
+                                val_k = cust_match.iloc[0, 10]
+                                try:
+                                    cust_cost = float(str(val_k).replace(',', '.') or 5.0)
+                                except:
+                                    cust_cost = 5.0
+
                         # Προεπιλογή ΝΑΙ/ΟΧΙ βάσει αποθήκευσης ημέρας αν υπάρχει
                         existing_rec = pd.DataFrame()
                         if not today_att.empty:
@@ -341,14 +355,14 @@ else:
 
                         col1, col2, col3 = st.columns([3, 2, 2])
                         col1.write(f"**{lname} {fname}** (ID: {c_id})")
-                        col2.write(f"Τύπος: *{energy_type}*")
+                        col2.write(f"Τύπος: *{energy_type}* | Κόστος: {cust_cost}€")
                         val = col3.toggle("ΝΑΙ / ΟΧΙ", value=default_val, key=f"att_{c_id}")
+                        
                         attendance_inputs[c_id] = {
                             'val': val,
                             'row_idx': idx + 2, # Google sheet row index
                             'energy': energy_type,
-                            'prog': str(r.get('program', '')).strip(),
-                            'adj_cost': str(r.get('adjusted_cost', '')).strip(),
+                            'cust_cost': cust_cost,
                             'fname': fname,
                             'lname': lname
                         }
@@ -373,7 +387,6 @@ else:
                                 status_str = "ΝΑΙ" if data['val'] else "ΟΧΙ"
                                 
                                 # 1. Καταχώρηση παρουσίας στο db_attendances
-                                # Ελέγχουμε αν υπάρχει ήδη εγγραφή για σήμερα να την ενημερώσουμε ή να προσθέσουμε νέα
                                 found_att = False
                                 if att_records:
                                     for ai, a_row in enumerate(att_records, start=2):
@@ -387,14 +400,6 @@ else:
 
                                 # 2. Υπολογισμός adjusted_cost αν είναι 'Ανοιχτή πληρωμή'
                                 if data['energy'].lower() == 'ανοιχτή πληρωμή' and data['val']:
-                                    # Βρίσκουμε τη βασική τιμή προγράμματος
-                                    base_cost = 5.0 # προεπιλογή 5€ αν δεν βρεθεί
-                                    if not progs_df.empty:
-                                        p_match = progs_df[progs_df['program_name'].astype(str).str.strip().str.lower() == data['prog'].lower()]
-                                        if not p_match.empty:
-                                            base_cost = float(p_match.iloc[0].get('program_cost', 5.0) or 5.0)
-                                    
-                                    # Υπολογισμός πολλαπλασιασμού βάσει παρουσιών ΝΑΙ
                                     # Μετράμε πόσες φορές έχει γίνει ΝΑΙ συνολικά για αυτόν τον μαθητή στο έτος
                                     current_nais = 1
                                     if att_records:
@@ -402,7 +407,7 @@ else:
                                         if not found_att and data['val']:
                                             current_nais += 1
 
-                                    new_adjusted_cost = base_cost * current_nais
+                                    new_adjusted_cost = data['cust_cost'] * current_nais
                                     sh_reg.update_cell(data['row_idx'], 10, new_adjusted_cost)
 
                             st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε και οι χρεώσεις ενημερώθηκαν επιτυχώς!")
@@ -470,7 +475,6 @@ else:
                 class_options = ["Xωρίς Τμήμα"] + (classes_df['class_name'].unique().tolist() if not classes_df.empty else [])
                 sel_class = st.selectbox("🏫 Τμήμα", options=class_options)
                 
-                # Επιλογή τύπου πληρωμής για αποθήκευση στη στήλη K (energy)
                 energy_options = ["Ανοιχτή πληρωμή", "Κλειστή πληρωμή"]
                 def_energy_idx = 0
                 if reg_to_edit is not None and 'energy' in reg_to_edit:
@@ -486,7 +490,6 @@ else:
                         if mode == "Νέα Εγγραφή":
                             records = sh.get_all_records()
                             next_reg = int(pd.DataFrame(records)['id_registration'].max()) + 1 if records and 'id_registration' in pd.DataFrame(records).columns else 1
-                            # Στήλες: id_registration, id_customer, customer_firstname, customer_lastname, school_year, program, class, status, stop_date, adjusted_cost, energy (Στήλη K)
                             sh.append_row([next_reg, int(c_id), str(row['customer_firstname']), str(row['customer_lastname']), str(s_year), str(s_prog), str(sel_class), "ACTIVE", "", adj_cost, sel_energy])
                         else:
                             target_reg_id = str(reg_to_edit['id_registration']).strip()
@@ -497,15 +500,15 @@ else:
                                     sh.update_cell(r_idx, 6, str(s_prog))
                                     sh.update_cell(r_idx, 7, str(sel_class))
                                     sh.update_cell(r_idx, 10, adj_cost)
-                                    sh.update_cell(r_idx, 11, sel_energy) # Στήλη K
+                                    sh.update_cell(r_idx, 11, sel_energy)
                                     break
-                        st.success("✅ Η εγγραφή ενημερώθηκε επιτυχώς με τον τύπο πληρωμής!")
+                        st.success("✅ Η εγγραφή ενημερώθηκε επιτυχώς!")
                         time.sleep(1.5)
                         st.rerun()
                     except Exception as e:
                         st.error(f"Σφάλμα: {e}")
 
-    # --- ΥΠΟΛΟΙΠΕΣ ΣΕΛΙΔΕΣ (Μητρώο, Πληρωμές, Εξοδα, Παράπονα κλπ.) ---
+    # --- ΥΠΟΛΟΙΠΕΣ ΣΕΛΙΔΕΣ ---
     elif st.session_state.page == "register":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
         st.subheader("Νέα Εγγραφή Πελάτη")
@@ -550,8 +553,7 @@ else:
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun()
         st.subheader("Διαχείριση STOP")
         reg_df = load_specific_db("db_registrations")
-        if not reg_df.empty:
-            st.dataframe(reg_df, use_container_width=True, hide_index=True)
+        if not reg_df.empty: st.dataframe(reg_df, use_container_width=True, hide_index=True)
 
     elif st.session_state.page == "add_payment":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
@@ -581,8 +583,7 @@ else:
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun()
         st.subheader("Ιστορικό Πληρωμών")
         pays = load_specific_db("db_payments")
-        if not pays.empty:
-            st.dataframe(pays, use_container_width=True, hide_index=True)
+        if not pays.empty: st.dataframe(pays, use_container_width=True, hide_index=True)
 
     elif st.session_state.page == "corp_payments":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
