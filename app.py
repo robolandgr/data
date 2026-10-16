@@ -389,7 +389,6 @@ else:
             cust_df.columns = cust_df.columns.astype(str).str.strip()
             cust_df['id_customer'] = pd.to_numeric(cust_df['id_customer'], errors='coerce')
 
-            prog_col_name = next((c for c in regs_df.columns if c.lower() in ['program', 'δ', 'j', 'πρόγραμμα']), 'program')
             priv_regs = regs_df[(regs_df['class'].astype(str).str.strip().str.lower() == 'ιδιωτικά') & (regs_df['school_year'].astype(str).str.strip() == selected_year_att)].copy()
 
             if priv_regs.empty:
@@ -408,7 +407,7 @@ else:
                         c_id = str(r['id_customer']).strip()
                         fname = str(r['customer_firstname']).strip()
                         lname = str(r['customer_lastname']).strip()
-                        prog_name = str(r.iloc[9] if len(r) > 9 else r.get(prog_col_name, '')).strip()
+                        prog_name = str(r.iloc[9] if len(r) > 9 else r.get('program', '')).strip()
                         energy_type = str(r.get('energy', 'Ανοιχτή πληρωμή')).strip()
                         
                         cust_match = cust_df[cust_df['id_customer'] == pd.to_numeric(c_id, errors='coerce')]
@@ -711,7 +710,7 @@ else:
                     except Exception as e:
                         st.error(f"Σφάλμα: {e}")
 
-    # --- ΣΕΛΙΔΑ: ΚΑΤΑΧΩΡΗΣΗ ΠΛΗΡΩΜΗΣ ΣΥΝΔΡΟΜΗΣ (ΜΕ ΥΠΟΛΟΙΠΟ) ---
+    # --- ΣΕΛΙΔΑ: ΚΑΤΑΧΩΡΗΣΗ ΠΛΗΡΩΜΗΣ ΣΥΝΔΡΟΜΗΣ (ΜΕ ΥΠΟΛΟΙΠΟ ΚΑΙ ΜΗΔΕΝΙΣΜΟ) ---
     elif st.session_state.page == "add_payment":
         if st.button("⬅️ Μενού", use_container_width=True): 
             st.session_state.page = "menu"; st.rerun() 
@@ -737,7 +736,7 @@ else:
                     yr = st.selectbox("📅 Έτος:", options=user_regs['school_year'].unique().tolist())
                     prog = st.selectbox("📚 Πρόγραμμα:", options=user_regs[prog_col_name].unique().tolist())
                     
-                    # --- ΥΠΟΛΟΓΙΣΜΟΣ ΥΠΟΛΟΙΠΟΥ (ΧΡΕΩΣΗ - ΠΛΗΡΩΜΕΝΑ) ---
+                    # --- ΥΠΟΛΟΓΙΣΜΟΣ ΥΠΟΛΟΙΠΟΥ ---
                     current_reg_row = user_regs[(user_regs['school_year'].astype(str) == str(yr)) & (user_regs[prog_col_name].astype(str) == str(prog))]
                     total_cost = 0.0
                     if not current_reg_row.empty:
@@ -759,7 +758,7 @@ else:
 
                     remaining_balance = total_cost - paid_amount
 
-                    # Πλαίσιο πληροφοριών υπολοίπου
+                    # Εμφάνιση πληροφοριών υπολοίπου
                     st.info(f"💰 **Συμφωνηθέν ποσό (adjusted_cost):** {total_cost:.2f}€ | 💸 **Έχει πληρώσει:** {paid_amount:.2f}€ | 📉 **Υπόλοιπο (Χρωστάει):** {remaining_balance:.2f}€")
 
                     with st.form("pay"):
@@ -777,22 +776,31 @@ else:
                                     records = sh.get_all_records()
                                     nid = int(pd.DataFrame(records)['id_payment'].max()) + 1 if records and 'id_payment' in pd.DataFrame(records).columns else 1
                                     
+                                    # Αποθήκευση πληρωμής (με το πρόγραμμα στη στήλη J / index 9)
                                     sh.append_row([nid, c_id, row['customer_lastname'], row['customer_firstname'], datetime.today().strftime('%Y-%m-%d'), rec, amt, yr, pay_method, prog])
                                     
-                                    # Μηδενισμός adjusted_cost μετά την πληρωμή
+                                    # --- ΔΥΝΑΜΙΚΟΣ ΜΗΔΕΝΙΣΜΟΣ ΤΟΥ ADJUSTED_COST ΣΤΟ DB_REGISTRATIONS ---
                                     try:
                                         sh_reg = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
-                                        all_regs = sh_reg.get_all_values()
-                                        if len(all_regs) > 1:
-                                            for ri, rvals in enumerate(all_regs[1:], start=2):
-                                                if len(rvals) > 5 and str(rvals[1]).strip() == str(c_id) and str(rvals[4]).strip() == str(yr) and str(rvals[9]).strip().lower() == str(prog).lower():
-                                                    sh_reg.update_cell(ri, 10, 0.0)
-                                                    break
-                                    except Exception:
-                                        pass
+                                        reg_all_data = sh_reg.get_all_values()
+                                        if len(reg_all_data) > 1:
+                                            header = [h.strip().lower() for h in reg_all_data[0]]
+                                            idx_id = next((i for i, h in enumerate(header) if 'customer' in h), 1)
+                                            idx_yr = next((i for i, h in enumerate(header) if 'year' in h), 4)
+                                            idx_pr = next((i for i, h in enumerate(header) if 'prog' in h), 9)
+                                            idx_adj = next((i for i, h in enumerate(header) if 'adjusted' in h or 'cost' in h), 9)
+
+                                            for r_idx, row_vals in enumerate(reg_all_data[1:], start=2):
+                                                if len(row_vals) > max(idx_id, idx_yr, idx_pr):
+                                                    if str(row_vals[idx_id]).strip() == str(c_id) and str(row_vals[idx_yr]).strip() == str(yr) and str(row_vals[idx_pr]).strip().lower() == str(prog).lower():
+                                                        sh_reg.update_cell(r_idx, idx_adj + 1, 0.0)
+                                                        break
+                                    except Exception as ex:
+                                        st.warning(f"Σφάλμα μηδενισμού χρέωσης: {ex}")
 
                                     check_and_update_status_to_finish(c_id, yr, prog)
-                                    st.success("✅ Η πληρωμή καταχωρήθηκε και το συμφωνηθέν ποσό μηδενίστηκε!")
+                                    st.success("✅ Η πληρωμή καταχωρήθηκε και το συμφωνηθέν ποσό μηδενίστηκε επιτυχώς!")
+                                    time.sleep(1.5)
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"Σφάλμα: {e}")
