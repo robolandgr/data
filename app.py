@@ -339,16 +339,6 @@ else:
             st.session_state.page = "add_payment"; st.rerun()
                 
         st.markdown("---")
-        st.subheader("Καθηγητές")
-        col_p1, col_p2 = st.columns(2)
-        with col_p1:
-            if st.button("👨‍🏫 Εγγραφή/Επεξεργασία Καθηγητή", use_container_width=True):
-                st.session_state.page = "register_teacher"; st.rerun()        
-        with col_p2:
-            if st.button("👩‍🏫 Στοιχεία Καθηγητών", use_container_width=True):
-                st.session_state.page = "teachers_secretariat"; st.rerun()
-
-        st.markdown("---")
         st.subheader("Διαχείριση Κέντρου")
         if st.button("📚 Προγράμματα - Τμήματα - Καθηγητές", use_container_width=True):
             st.session_state.page = "add_structure"; st.rerun()
@@ -757,57 +747,7 @@ else:
                             except Exception as e:
                                 st.error(f"Σφάλμα: {e}")
 
-    # --- ΣΕΛΙΔΑ: ΔΙΑΧΕΙΡΙΣΗ ΚΑΘΗΓΗΤΩΝ ---
-    elif st.session_state.page == "register_teacher":
-        if st.button("⬅️ Μενού", use_container_width=True):
-            st.session_state.page = "menu"; st.rerun() 
-
-        st.subheader("Διαχείριση Καθηγητών")
-        df_teachers = load_specific_db("db_teachers")
-        
-        teach_opts = ["-- Νέα Εγγραφή --"]
-        if not df_teachers.empty and 'teacher_lastname' in df_teachers.columns:
-            df_teachers['full_name'] = df_teachers['teacher_lastname'].astype(str) + " " + df_teachers['teacher_firstname'].astype(str)
-            teach_opts += df_teachers['full_name'].tolist()
-
-        sel_teacher = st.selectbox("🔍 Επιλογή Καθηγητή", options=teach_opts)
-        selected_t = df_teachers[df_teachers['full_name'] == sel_teacher].iloc[0] if sel_teacher != "-- Νέα Εγγραφή --" and not df_teachers.empty else None
-
-        with st.form("teacher_form"):
-            t_fname = st.text_input("Όνομα", value=selected_t.get('teacher_firstname', '') if selected_t is not None else "")
-            t_lname = st.text_input("Επώνυμο", value=selected_t.get('teacher_lastname', '') if selected_t is not None else "")
-            t_email = st.text_input("Email", value=selected_t.get('teacher_email', '') if selected_t is not None else "")
-            t_tel = st.text_input("Τηλέφωνο", value=selected_t.get('teacher_telephone', '') if selected_t is not None else "")
-            t_bank = st.selectbox("Τράπεζα", ["Εθνική", "Πειραιώς", "Alpha Bank", "Eurobank", "Attica Bank"])
-            t_iban = st.text_input("IBAN", value=selected_t.get('teacher_iban', '') if selected_t is not None else "")
-
-            if st.form_submit_button("💾 Αποθήκευση"):
-                try:
-                    gc = get_gspread_client()
-                    sh = gc.open(OLD_SHEET_NAME).worksheet("db_teachers")
-                    if selected_t is None:
-                        next_id = int(pd.DataFrame(df_teachers)['teacher_id'].max()) + 1 if not df_teachers.empty and 'teacher_id' in df_teachers.columns else 1
-                        sh.append_row([next_id, t_fname, t_lname, t_email, t_tel, t_bank, t_iban])
-                        st.success("✅ Νέος καθηγητής καταχωρήθηκε!")
-                    else:
-                        row_idx = selected_t.name + 2
-                        sh.update(f"B{row_idx}:G{row_idx}", [[t_fname, t_lname, t_email, t_tel, t_bank, t_iban]])
-                        st.success("✅ Τα στοιχεία ενημερώθηκαν!")
-                    time.sleep(1.2)
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Σφάλμα: {e}")
-
-    # --- ΣΕΛΙΔΑ: ΣΤΟΙΧΕΙΑ ΚΑΘΗΓΗΤΩΝ ---
-    elif st.session_state.page == "teachers_secretariat":
-        if st.button("⬅️ Μενού", use_container_width=True): 
-            st.session_state.page = "menu"; st.rerun() 
-        st.subheader("👩‍🏫 Στοιχεία Καθηγητών")
-        teachers_df = load_specific_db("db_teachers")
-        if not teachers_df.empty:
-            st.dataframe(teachers_df, use_container_width=True, hide_index=True)
-        else:
-            st.info("Δεν βρέθηκαν καθηγητές.")
+    
 
     # --- ΣΕΛΙΔΑ: ΔΟΜΗ / ΠΡΟΓΡΑΜΜΑΤΑ / ΤΜΗΜΑΤΑ ---
     elif st.session_state.page == "add_structure":
@@ -879,18 +819,6 @@ else:
                     st.download_button("📥 Κατεβάστε το αρχείο", data=rep_pdf, file_name="mitroo.pdf", mime="application/pdf")
         else:
             st.info("Δεν βρέθηκαν εγγραφές.")
-
-    # --- ΣΕΛΙΔΑ: ΑΝΑΦΟΡΑ ΚΑΘΗΓΗΤΩΝ & ΤΜΗΜΑΤΩΝ ---
-    elif st.session_state.page == "teacher_report":
-        if st.button("⬅️ Μενού", use_container_width=True): 
-            st.session_state.page = "menu"; st.rerun() 
-            
-        st.subheader("Αναφορά Καθηγητών & Τμημάτων")
-        classes_df = load_specific_db("db_class")
-        if not classes_df.empty:
-            st.dataframe(classes_df, use_container_width=True, hide_index=True)
-        else:
-            st.info("Δεν βρέθηκαν τμήματα.")
 
     # --- ΣΕΛΙΔΑ: ΕΚΔΗΛΩΣΗ ΕΝΔΙΑΦΕΡΟΝΤΟΣ (ΑΝΕΝΤΑΧΤΟΙ) ---
     elif st.session_state.page == "unassigned_customers":
