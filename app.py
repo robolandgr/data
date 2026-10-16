@@ -156,6 +156,36 @@ def generate_customer_payment_history_pdf(customer_name, selected_year, payments
     buffer.seek(0)
     return buffer
 
+def generate_attendances_pdf(attendances_df, selected_year):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    story = []
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=12, alignment=1, fontName='Helvetica-Bold', textColor=colors.HexColor('#111827'), spaceAfter=10)
+    sub_style = ParagraphStyle('Sub', parent=styles['Normal'], fontSize=10, alignment=1, fontName='Helvetica-Bold', textColor=colors.HexColor('#4B5563'), spaceAfter=15)
+    th_style = ParagraphStyle('TH', parent=styles['Normal'], fontSize=8.5, fontName='Helvetica-Bold', textColor=colors.white)
+    td_style = ParagraphStyle('TD', parent=styles['Normal'], fontSize=8.5, fontName='Helvetica', textColor=colors.HexColor('#111827'))
+
+    story.append(Paragraph("ΜΑΖΙΚΗ ΑΝΑΦΟΡΑ ΠΑΡΟΥΣΙΩΝ ΜΑΘΗΤΩΝ (ΤΜΗΜΑ ΙΔΙΩΤΙΚΑ)", title_style))
+    story.append(Paragraph(f"ΣΧΟΛΙΚΟ ΕΤΟΣ: {selected_year}", sub_style))
+    story.append(Spacer(1, 5))
+
+    table_data = [[Paragraph("ΜΑΘΗΤΗΣ (ID)", th_style), Paragraph("ΗΜΕΡΟΜΗΝΙΑ", th_style), Paragraph("ΠΑΡΟΥΣΙΑ", th_style)]]
+    for _, row in attendances_df.iterrows():
+        table_data.append([
+            Paragraph(remove_accents(str(row.get('student_name', ''))), td_style),
+            Paragraph(str(row.get('date', '')), td_style),
+            Paragraph(str(row.get('status', '')), td_style)
+        ])
+
+    t = Table(table_data, colWidths=[200, 150, 100], repeatRows=1)
+    t.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1F2937')), ('ALIGN', (0,0), (-1,-1), 'LEFT'), ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#D1D5DB'))]))
+    story.append(t)
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
 def generate_monthly_attendances_pdf(report_df, month_str, year_str):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
@@ -335,7 +365,6 @@ else:
                         prog_name = str(r.get('program', '')).strip()
                         energy_type = str(r.get('energy', 'Ανοιχτή πληρωμή')).strip()
                         
-                        # Κόστος από db_customers στήλη K (index 10)
                         cust_match = cust_df[cust_df['id_customer'] == pd.to_numeric(c_id, errors='coerce')]
                         cust_cost = 5.0
                         if not cust_match.empty and len(cust_match.columns) >= 11:
@@ -344,7 +373,6 @@ else:
                             except:
                                 cust_cost = 5.0
 
-                        # Βρίσκουμε την τελευταία ημερομηνία πληρωμής για αυτόν τον μαθητή/πρόγραμμα/έτος
                         last_pay_date = None
                         if not pays_df.empty:
                             pays_df.columns = pays_df.columns.astype(str).str.strip()
@@ -365,7 +393,6 @@ else:
                         
                         default_val = False
                         if not existing_rec.empty:
-                            # Ασφαλής εύρεση στήλης status
                             status_col_name = next((c for c in existing_rec.columns if c.lower() == 'status'), None)
                             if status_col_name and str(existing_rec.iloc[0].get(status_col_name, '')).strip().upper() == 'ΝΑΙ':
                                 default_val = True
@@ -402,7 +429,6 @@ else:
                             for c_id, data in attendance_inputs.items():
                                 status_str = "ΝΑΙ" if data['val'] else "ΟΧΙ"
                                 
-                                # Καταχώρηση παρουσίας
                                 found_att = False
                                 if att_records:
                                     for ai, a_row in enumerate(att_records, start=2):
@@ -414,7 +440,6 @@ else:
                                     sh_att.append_row([next_att_id, c_id, f"{data['lname']} {data['fname']}", selected_year_att, today_date_str, status_str])
                                     next_att_id += 1
 
-                                # Υπολογισμός adjusted_cost αν είναι 'Ανοιχτή πληρωμή' με μηδενισμό από την τελευταία πληρωμή
                                 if data['energy'].lower() == 'ανοιχτή πληρωμή':
                                     count_nais = 0
                                     all_att_list = []
@@ -450,7 +475,6 @@ else:
                         except Exception as e:
                             st.error(f"Σφάλμα αποθήκευσης παρουσιών: {e}")
 
-        # --- ΜΑΖΙΚΗ ΑΝΑΦΟΡΑ & PDF ΠΑΡΟΥΣΙΩΝ ---
         st.markdown("---")
         st.markdown("#### 📊 Μαζική Αναφορά & PDF Παρουσίων Μαθητών")
         att_full_df = load_specific_db("db_attendances")
@@ -488,8 +512,6 @@ else:
             st.info("Δεν βρέθηκαν δεδομένα παρουσιών.")
         else:
             att_df.columns = att_df.columns.astype(str).str.strip()
-            
-            # Ασφαλής εντοπισμός στήλης status (ανεξαρτήτως πεζών/κεφαλαίων)
             status_col = next((c for c in att_df.columns if c.lower() == 'status'), None)
             if not status_col:
                 st.error("Δεν βρέθηκε η στήλη 'status' στο φύλλο db_attendances.")
@@ -705,7 +727,7 @@ else:
                 sh = gc.open(OLD_SHEET_NAME).worksheet("db_payments_company")
                 recs = sh.get_all_records()
                 nid = int(pd.DataFrame(recs)['id'].max()) + 1 if recs and 'id' in pd.DataFrame(recs).columns else 1
-                sh.append_row([nid, inv, "Έξοδα", "", sup, "2026-2027", datetime.today().strftime('%Y-%m-%d'), datetime.today().strftime('%Y-%m-%d'), datetime.today().strftime('%Y-%m-%d'], amt, "Μετρητά"])
+                sh.append_row([nid, inv, "Έξοδα", "", sup, "2026-2027", datetime.today().strftime('%Y-%m-%d'), datetime.today().strftime('%Y-%m-%d'), datetime.today().strftime('%Y-%m-%d'), amt, "Μετρητά"])
                 st.success("✅ Το έξοδο αποθηκεύτηκε!")
                 st.rerun()
 
