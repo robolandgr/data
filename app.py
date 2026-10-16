@@ -10,8 +10,6 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 
 # --- ΡΥΘΜΙΣΕΙΣ ΒΑΣΗΣ ---
 OLD_SHEET_NAME = "Database_Center" # Το μοναδικό σου Google Sheet
@@ -76,21 +74,6 @@ def load_specific_db(sheet_name):
 
 st.set_page_config(page_title="ROBOLAND DB", page_icon="🤖", layout="wide")
 
-def process_teachers_df(df):
-    df = df.copy()
-    if 'teacher_lastname' in df.columns and 'teacher_firstname' in df.columns:
-        df['full_name'] = df['teacher_lastname'].astype(str) + " " + df['teacher_firstname'].astype(str)
-    else:
-        df['full_name'] = "Άγνωστος"
-    return df
-
-CUSTOMER_COLUMNS = ['id_customer', 'customer_firstname', 'customer_lastname', 'parent_firstname', 'parent_lastname', 'telephone', 'email', 'address', 'birthday_date', 'register_date']
-PROGRAM_COLUMNS = ['id_program', 'program_name', 'program_cost']
-REGISTRATION_COLUMNS = ['id_registration', 'id_customer', 'customer_firstname', 'customer_lastname', 'school_year', 'program', 'class', 'status', 'stop_date', 'adjusted_cost']
-PAYMENT_COLUMNS = ['id_payment', 'id_customer', 'customer_lastname', 'customer_firstname', 'payment_date', 'receipt_number', 'amount_paid', 'school_year']
-CLASS_COLUMNS = ['id_class', 'class_name', 'program_name']
-TEACHER_COLUMNS = ['teacher_id', 'teacher_firstname', 'teacher_lastname', 'teacher_email', 'teacher_telephone', 'teacher_bank', 'teacher_iban']
-
 def uppercase_clean(val):
     s = str(val).strip().upper()
     tones = {
@@ -106,15 +89,6 @@ def remove_accents(input_str):
     if not isinstance(input_str, str): return str(input_str)
     nfkd_form = unicodedata.normalize('NFKD', input_str)
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
-
-def clean_text(val):
-    s = str(val).strip().lower()
-    tones = {'ά': 'α', 'έ': 'ε', 'ή': 'η', 'ί': 'ι', 'ό': 'ο', 'ύ': 'υ', 'ώ': 'ω', 'ΐ': 'ι', 'ΰ': 'υ'}
-    for t, letter in tones.items():
-        s = s.replace(t, letter)
-    if s.endswith('ς') or s.endswith('σ'):
-        s = s[:-1]
-    return s
 
 def check_and_update_status_to_finish(c_id, school_year, program):
     try:
@@ -155,108 +129,60 @@ def check_and_update_status_to_finish(c_id, school_year, program):
         st.error(f"Σφάλμα κατά την ενημέρωση status: {e}")
 
 # --- PDF ΣΥΝΑΡΤΗΣΕΙΣ ---
-def generate_report_pdf_customers(report_df, selected_year="ΟΛΑ", selected_student="ΟΛΟΙ"):
+def generate_customer_payment_history_pdf(customer_name, selected_year, payments_df):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
     story = []
     styles = getSampleStyleSheet()
 
-    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=15, alignment=1, textColor=colors.HexColor('#1F2937'), fontName='Helvetica-Bold')
-    subtitle_style = ParagraphStyle('SubTitleStyle', parent=styles['Normal'], fontSize=11, alignment=1, spaceAfter=20, textColor=colors.HexColor('#4B5563'), fontName='Helvetica-Bold')
-    label_style = ParagraphStyle('LabelStyle', parent=styles['Normal'], fontSize=8.5, fontName='Helvetica-Bold', textColor=colors.HexColor('#4B5563'))
-    value_style = ParagraphStyle('ValueStyle', parent=styles['Normal'], fontSize=9.5, fontName='Helvetica-Bold', textColor=colors.HexColor('#111827'))
-    name_style = ParagraphStyle('NameStyle', parent=styles['Normal'], fontSize=11, fontName='Helvetica-Bold', textColor=colors.HexColor('#1F2937'))
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=12, alignment=1, fontName='Helvetica-Bold', textColor=colors.HexColor('#111827'), spaceAfter=10)
+    sub_style = ParagraphStyle('Sub', parent=styles['Normal'], fontSize=10, alignment=1, fontName='Helvetica-Bold', textColor=colors.HexColor('#4B5563'), spaceAfter=15)
+    th_style = ParagraphStyle('TH', parent=styles['Normal'], fontSize=8.5, fontName='Helvetica-Bold', textColor=colors.white)
+    td_style = ParagraphStyle('TD', parent=styles['Normal'], fontSize=8.5, fontName='Helvetica', textColor=colors.HexColor('#111827'))
+    total_style = ParagraphStyle('Total', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', alignment=2, textColor=colors.HexColor('#111827'))
 
-    story.append(Paragraph("ΜΗΤΡΩΟ ΠΕΛΑΤΩΝ", title_style))
-    filter_text = f"ΦΙΛΤΡΑ: ΕΤΟΣ: {remove_accents(str(selected_year).upper())} | ΜΑΘΗΤΗΣ: {remove_accents(str(selected_student).upper())}"
-    story.append(Paragraph(filter_text, subtitle_style))
-    story.append(Spacer(1, 10))
+    story.append(Paragraph("ΑΝΑΛΥΤΙΚΟ ΙΣΤΟΡΙΚΟ ΠΛΗΡΩΜΩΝ ΜΑΘΗΤΗ", title_style))
+    filter_info = f"ΜΑΘΗΤΗΣ: {remove_accents(str(customer_name).upper())} | ΕΤΟΣ: {remove_accents(str(selected_year).upper())}"
+    story.append(Paragraph(filter_info, sub_style))
+    story.append(Spacer(1, 5))
 
-    for index, row in report_df.iterrows():
-        lname = remove_accents(str(row.get('customer_lastname', '')).upper())
-        fname = remove_accents(str(row.get('customer_firstname', '')).upper())
-        year = remove_accents(str(row.get('school_year', '')).upper())
-        prog = remove_accents(str(row.get('program', '')).upper())
-        u_class = remove_accents(str(row.get('class', '')).upper())
-        status = remove_accents(str(row.get('status', '')).upper())
+    table_data = [[
+        Paragraph("ΗΜΕΡΟΜΗΝΙΑ", th_style),
+        Paragraph("ΑΡ. ΑΠΟΔΕΙΞΗΣ", th_style),
+        Paragraph("ΠΡΟΓΡΑΜΜΑ", th_style),
+        Paragraph("ΕΤΟΣ", th_style),
+        Paragraph("ΤΡΟΠΟΣ", th_style),
+        Paragraph("ΠΟΣΟ (€)", th_style)
+    ]]
 
-        row_data = [
-            [Paragraph("ΜΑΘΗΤΗΣ:", label_style), Paragraph("ΣΧΟΛΙΚΟ ΕΤΟΣ:", label_style), Paragraph("ΚΑΤΑΣΤΑΣΗ:", label_style)],
-            [Paragraph(f"{lname} {fname}", name_style), Paragraph(year, value_style), Paragraph(status, value_style)],
-            [Paragraph("ΠΡΟΓΡΑΜΜΑ:", label_style), Paragraph("ΤΜΗΜΑ:", label_style), Paragraph("", label_style)],
-            [Paragraph(prog, value_style), Paragraph(u_class, value_style), Paragraph("", value_style)]
-        ]
-        
-        t = Table(row_data, colWidths=[270, 135, 135])
-        t.setStyle(TableStyle([
-            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#E5E7EB')),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#F3F4F6')),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ]))
-        story.append(t)
-        story.append(Spacer(1, 10))
-
-    doc.build(story)
-    buffer.seek(0)
-    return buffer
-
-def generate_teacher_pdf(report_df, selected_year, selected_teacher):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
-    story = []
-    styles = getSampleStyleSheet()
-    
-    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=15, alignment=1, fontName='Helvetica-Bold')
-    sub_style = ParagraphStyle('Sub', parent=styles['Normal'], fontSize=11, alignment=1, spaceAfter=20, fontName='Helvetica-Bold')
-    label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold')
-    val_style = ParagraphStyle('Val', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold')
-
-    story.append(Paragraph("ΑΝΑΦΟΡΑ ΚΑΘΗΓΗΤΩΝ", title_style))
-    story.append(Paragraph(f"ΕΤΟΣ: {remove_accents(str(selected_year).upper())} | ΚΑΘΗΓΗΤΗΣ: {remove_accents(str(selected_teacher).upper())}", sub_style))
-
-    for _, row in report_df.iterrows():
-        data = [
-            [Paragraph("ΤΜΗΜΑ:", label_style), Paragraph(remove_accents(str(row.get('class_name', '')).upper()), val_style)],
-            [Paragraph("ΠΡΟΓΡΑΜΜΑ:", label_style), Paragraph(remove_accents(str(row.get('program_name', '')).upper()), val_style)],
-            [Paragraph("ΚΑΘΗΓΗΤΗΣ:", label_style), Paragraph(remove_accents(str(row.get('teachers', '')).upper()), val_style)],
-            [Paragraph("ΜΑΘΗΤΕΣ:", label_style), Paragraph(str(row.get('Μαθητές', '0')), val_style)]
-        ]
-        t = Table(data, colWidths=[150, 350])
-        t.setStyle(TableStyle([('BOX', (0,0), (-1,-1), 0.5, colors.black), ('GRID', (0,0), (-1,-1), 0.2, colors.grey)]))
-        story.append(t)
-        story.append(Spacer(1, 10))
-        
-    doc.build(story)
-    buffer.seek(0)
-    return buffer
-
-def generate_class_pdf(students_df, class_name, teacher_name, program_name, is_paid):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
-    story = []
-    styles = getSampleStyleSheet()
-    
-    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=14, fontName='Helvetica-Bold')
-    info_style = ParagraphStyle('Info', parent=styles['Normal'], fontSize=10, spaceAfter=10, fontName='Helvetica-Bold')
-
-    story.append(Paragraph(f"ΤΜΗΜΑ: {remove_accents(class_name.upper())}", title_style))
-    story.append(Paragraph(f"ΚΑΘΗΓΗΤΗΣ: {remove_accents(teacher_name.upper())} | ΠΡΟΓΡΑΜΜΑ: {remove_accents(program_name.upper())}", info_style))
-    story.append(Paragraph(f"ΑΠΟΠΛΗΡΩΜΗ: {'ΝΑΙ' if is_paid else 'ΟΧΙ'}", info_style))
-    story.append(Spacer(1, 10))
-
-    table_data = [["ΕΠΩΝΥΜΟ", "ΟΝΟΜΑ", "ΤΗΛΕΦΩΝΟ"]]
-    for _, row in students_df.iterrows():
+    total_amount = 0.0
+    for _, row in payments_df.iterrows():
+        amt = float(row.get('Ποσό (€)', 0))
+        total_amount += amt
         table_data.append([
-            remove_accents(str(row.get('Επώνυμο', '')).upper()),
-            remove_accents(str(row.get('Όνομα', '')).upper()),
-            str(row.get('Τηλέφωνο', ''))
+            Paragraph(str(row.get('Ημερομηνία', '')), td_style),
+            Paragraph(remove_accents(str(row.get('Αρ. Απόδειξης', ''))), td_style),
+            Paragraph(remove_accents(str(row.get('Πρόγραμμα', ''))), td_style),
+            Paragraph(str(row.get('Έτος', '')), td_style),
+            Paragraph(remove_accents(str(row.get('Τρόπος', ''))), td_style),
+            Paragraph(f"{amt:.2f}", td_style)
         ])
+
+    t = Table(table_data, colWidths=[70, 85, 140, 60, 85, 60], repeatRows=1)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1F2937')),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+        ('TOPPADDING', (0,0), (-1,-1), 5),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#D1D5DB')),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F9FAFB')])
+    ]))
     
-    t = Table(table_data, repeatRows=1)
-    t.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.black), ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold')]))
     story.append(t)
-    
+    story.append(Spacer(1, 15))
+    story.append(Paragraph(f"ΣΥΝΟΛΙΚΟ ΠΟΣΟ ΠΛΗΡΩΜΩΝ: {total_amount:.2f} EUR", total_style))
+
     doc.build(story)
     buffer.seek(0)
     return buffer
@@ -334,13 +260,28 @@ else:
                 st.session_state.page = "renew_registration"; st.rerun()
 
         st.markdown("---")
-        st.subheader("Πληρωμές")
-        if st.button("💳 Καταχώρηση Πληρωμής (Συνδρομή)", use_container_width=True):
-            st.session_state.page = "add_payment"; st.rerun()
+        st.subheader("Πληρωμές & Οικονομικά")
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            if st.button("💳 Καταχώρηση Πληρωμής (Συνδρομή)", use_container_width=True):
+                st.session_state.page = "add_payment"; st.rerun()
+        with col_p2:
+            if st.button("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή", use_container_width=True):
+                st.session_state.page = "payment_history_report"; st.rerun()
                 
         st.markdown("---")
+        st.subheader("Καθηγητές")
+        col_t1, col_t2 = st.columns(2)
+        with col_t1:
+            if st.button("👨‍🏫 Εγγραφή/Επεξεργασία Καθηγητή", use_container_width=True):
+                st.session_state.page = "register_teacher"; st.rerun()        
+        with col_t2:
+            if st.button("👩‍🏫 Στοιχεία Καθηγητών", use_container_width=True):
+                st.session_state.page = "teachers_secretariat"; st.rerun()
+
+        st.markdown("---")
         st.subheader("Διαχείριση Κέντρου")
-        if st.button("📚 Προγράμματα - Τμήματα", use_container_width=True):
+        if st.button("📚 Προγράμματα - Τμήματα - Καθηγητές", use_container_width=True):
             st.session_state.page = "add_structure"; st.rerun()
 
         st.markdown("---")
@@ -360,6 +301,8 @@ else:
             if st.session_state.role in ["employee", "admin", "master"]:
                 if st.button("📋 Μητρώο Πελατών", use_container_width=True):
                     st.session_state.page = "anafora_pelaton"; st.rerun()
+                if st.button("🏫 Αναφορά Καθηγητών & Τμημάτων", use_container_width=True):
+                    st.session_state.page = "teacher_report"; st.rerun()
         with col_r2:
             if st.button("🚫 Εκδήλωση Ενδιαφέροντος", use_container_width=True):
                 st.session_state.page = "unassigned_customers"; st.rerun()
@@ -745,7 +688,118 @@ else:
                             except Exception as e:
                                 st.error(f"Σφάλμα: {e}")
 
-    
+    # --- ΣΕΛΙΔΑ: ΑΝΑΦΟΡΑ & ΙΣΤΟΡΙΚΟ ΠΛΗΡΩΜΩΝ ΜΑΘΗΤΗ ---
+    elif st.session_state.page == "payment_history_report":
+        if st.button("⬅️ Μενού", use_container_width=True):
+            st.session_state.page = "menu"; st.rerun()
+
+        st.subheader("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή")
+        cust_df = load_specific_db("db_customers")
+        pays_df = load_specific_db("db_payments")
+
+        if cust_df.empty:
+            st.warning("Η βάση πελατών είναι κενή.")
+        else:
+            cust_df['display'] = cust_df['customer_lastname'].astype(str) + " " + cust_df['customer_firstname'].astype(str) + " (ID: " + cust_df['id_customer'].astype(str) + ")"
+            sel_cust_rep = st.selectbox("🔍 Επιλογή Μαθητή για Ιστορικό", options=["-- Επιλέξτε --"] + cust_df['display'].tolist())
+
+            if sel_cust_rep != "-- Επιλέξτε --":
+                c_row = cust_df[cust_df['display'] == sel_cust_rep].iloc[0]
+                c_id = str(c_row['id_customer']).strip()
+                target_lname = str(c_row['customer_lastname']).strip().lower()
+                target_fname = str(c_row['customer_firstname']).strip().lower()
+
+                if not pays_df.empty:
+                    pays_df.columns = pays_df.columns.astype(str).str.strip()
+                    matched_pays = pays_df[
+                        (pays_df['id_customer'].astype(str).str.strip() == c_id) |
+                        ((pays_df['customer_lastname'].astype(str).str.strip().str.lower() == target_lname) & 
+                         (pays_df['customer_firstname'].astype(str).str.strip().str.lower() == target_fname))
+                    ].copy()
+
+                    if not matched_pays.empty:
+                        view_pays = []
+                        for _, pr in matched_pays.iterrows():
+                            view_pays.append({
+                                'Ημερομηνία': pr.get('payment_date', ''),
+                                'Αρ. Απόδειξης': pr.get('receipt_number', ''),
+                                'Πρόγραμμα': pr.get('program', ''),
+                                'Έτος': pr.get('school_year', ''),
+                                'Τρόπος': pr.get('pay_method', ''),
+                                'Ποσό (€)': float(str(pr.get('amount_paid', 0)).replace(',', '.') or 0)
+                            })
+                        
+                        df_p_view = pd.DataFrame(view_pays)
+                        st.dataframe(df_p_view, use_container_width=True, hide_index=True)
+                        tot_amt = df_p_view['Ποσό (€)'].sum()
+                        st.markdown(f"**Συνολικό Ποσό Πληρωμών:** {tot_amt:.2f}€")
+
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        if st.button("📥 Παραγωγή PDF Ιστορικού Πληρωμών"):
+                            pdf_data = generate_customer_payment_history_pdf(sel_cust_rep, "ΟΛΑ", df_p_view)
+                            if pdf_data:
+                                st.download_button(
+                                    label="📥 Κατεβάστε το PDF Πληρωμών",
+                                    data=pdf_data,
+                                    file_name=f"histoliko_pliromon_{sel_cust_rep.replace(' ', '_')}.pdf",
+                                    mime="application/pdf"
+                                )
+                    else:
+                        st.info("Δεν βρέθηκαν καταχωρημένες πληρωμές για αυτόν τον μαθητή.")
+                else:
+                    st.info("Η βάση πληρωμών (`db_payments`) είναι κενή.")
+
+    # --- ΣΕΛΙΔΑ: ΔΙΑΧΕΙΡΙΣΗ ΚΑΘΗΓΗΤΩΝ ---
+    elif st.session_state.page == "register_teacher":
+        if st.button("⬅️ Μενού", use_container_width=True):
+            st.session_state.page = "menu"; st.rerun() 
+
+        st.subheader("Διαχείριση Καθηγητών")
+        df_teachers = load_specific_db("db_teachers")
+        
+        teach_opts = ["-- Νέα Εγγραφή --"]
+        if not df_teachers.empty and 'teacher_lastname' in df_teachers.columns:
+            df_teachers['full_name'] = df_teachers['teacher_lastname'].astype(str) + " " + df_teachers['teacher_firstname'].astype(str)
+            teach_opts += df_teachers['full_name'].tolist()
+
+        sel_teacher = st.selectbox("🔍 Επιλογή Καθηγητή", options=teach_opts)
+        selected_t = df_teachers[df_teachers['full_name'] == sel_teacher].iloc[0] if sel_teacher != "-- Νέα Εγγραφή --" and not df_teachers.empty else None
+
+        with st.form("teacher_form"):
+            t_fname = st.text_input("Όνομα", value=selected_t.get('teacher_firstname', '') if selected_t is not None else "")
+            t_lname = st.text_input("Επώνυμο", value=selected_t.get('teacher_lastname', '') if selected_t is not None else "")
+            t_email = st.text_input("Email", value=selected_t.get('teacher_email', '') if selected_t is not None else "")
+            t_tel = st.text_input("Τηλέφωνο", value=selected_t.get('teacher_telephone', '') if selected_t is not None else "")
+            t_bank = st.selectbox("Τράπεζα", ["Εθνική", "Πειραιώς", "Alpha Bank", "Eurobank", "Attica Bank"])
+            t_iban = st.text_input("IBAN", value=selected_t.get('teacher_iban', '') if selected_t is not None else "")
+
+            if st.form_submit_button("💾 Αποθήκευση"):
+                try:
+                    gc = get_gspread_client()
+                    sh = gc.open(OLD_SHEET_NAME).worksheet("db_teachers")
+                    if selected_t is None:
+                        next_id = int(pd.DataFrame(df_teachers)['teacher_id'].max()) + 1 if not df_teachers.empty and 'teacher_id' in df_teachers.columns else 1
+                        sh.append_row([next_id, t_fname, t_lname, t_email, t_tel, t_bank, t_iban])
+                        st.success("✅ Νέος καθηγητής καταχωρήθηκε!")
+                    else:
+                        row_idx = selected_t.name + 2
+                        sh.update(f"B{row_idx}:G{row_idx}", [[t_fname, t_lname, t_email, t_tel, t_bank, t_iban]])
+                        st.success("✅ Τα στοιχεία ενημερώθηκαν!")
+                    time.sleep(1.2)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Σφάλμα: {e}")
+
+    # --- ΣΕΛΙΔΑ: ΣΤΟΙΧΕΙΑ ΚΑΘΗΓΗΤΩΝ ---
+    elif st.session_state.page == "teachers_secretariat":
+        if st.button("⬅️ Μενού", use_container_width=True): 
+            st.session_state.page = "menu"; st.rerun() 
+        st.subheader("👩‍🏫 Στοιχεία Καθηγητών")
+        teachers_df = load_specific_db("db_teachers")
+        if not teachers_df.empty:
+            st.dataframe(teachers_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("Δεν βρέθηκαν καθηγητές.")
 
     # --- ΣΕΛΙΔΑ: ΔΟΜΗ / ΠΡΟΓΡΑΜΜΑΤΑ / ΤΜΗΜΑΤΑ ---
     elif st.session_state.page == "add_structure":
