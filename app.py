@@ -3,7 +3,7 @@ import pandas as pd
 import gspread
 import time
 import unicodedata
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 from datetime import datetime
 import io
 from reportlab.lib.pagesizes import letter
@@ -55,7 +55,7 @@ def get_gspread_client():
         "client_x509_cert_url": st.secrets["connections"]["gsheets"]["client_x509_cert_url"]
     }
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     return gspread.authorize(creds)
 
 @st.cache_data(ttl=36000)
