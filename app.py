@@ -683,32 +683,81 @@ else:
         reg_df = load_specific_db("db_registrations")
         if not reg_df.empty: st.dataframe(reg_df, use_container_width=True, hide_index=True)
 
+    # --- ΣΕΛΙΔΑ: ΠΛΗΡΩΜΕΣ ---
     elif st.session_state.page == "add_payment":
-        if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
+        if st.button("⬅️ Μενού", use_container_width=True): 
+            st.session_state.page = "menu"; st.rerun() 
+            
         st.subheader("Καταχώρηση Πληρωμής Συνδρομής")
         cust_df = load_specific_db("db_customers")
         reg_df = load_specific_db("db_registrations")
+        pays_df = load_specific_db("db_payments")
+        
         if not cust_df.empty:
             cust_df['display'] = cust_df['customer_lastname'].astype(str) + " " + cust_df['customer_firstname'].astype(str) + " (ID: " + cust_df['id_customer'].astype(str) + ")"
-            sel = st.selectbox("Πελάτης", options=["-- Επιλέξτε --"] + cust_df['display'].tolist())
-            if sel != "-- Επιλέξτε --":
-                row = cust_df[cust_df['display'] == sel].iloc[0]
+            sel_cust = st.selectbox("🔍 Επιλογή Πελάτη", options=["-- Επιλέξτε --"] + cust_df['display'].tolist())
+            
+            if sel_cust != "-- Επιλέξτε --":
+                row = cust_df[cust_df['display'] == sel_cust].iloc[0]
                 c_id = int(row['id_customer'])
+                
                 user_regs = reg_df[reg_df['id_customer'].astype(str).str.strip() == str(c_id)]
-                with st.form("pay"):
-                    rec = st.text_input("Αρ. Απόδειξης")
-                    amt = st.number_input("Ποσό (€)", min_value=0.0)
-                    yr = st.selectbox("Έτος", user_regs['school_year'].unique().tolist() if not user_regs.empty else ["2026-2027"])
-                    prog = st.selectbox("Πρόγραμμα", user_regs['program'].unique().tolist() if not user_regs.empty else ["ROBOLAND"])
-                    if st.form_submit_button("💾 Αποθήκευση"):
-                        gc = get_gspread_client()
-                        sh = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
-                        recs = sh.get_all_records()
-                        nid = int(pd.DataFrame(recs)['id_payment'].max()) + 1 if recs and 'id_payment' in pd.DataFrame(recs).columns else 1
-                        sh.append_row([nid, c_id, row['customer_lastname'], row['customer_firstname'], datetime.today().strftime('%Y-%m-%d'), rec, amt, yr, "Μετρητά", prog])
-                        check_and_update_status_to_finish(c_id, yr, prog)
-                        st.success("✅ Καταχωρήθηκε!")
-                        st.rerun()
+                if user_regs.empty:
+                    st.error("⚠️ Ο πελάτης δεν έχει ενεργή εγγραφή σε πρόγραμμα.")
+                else:
+                    sel_y = st.selectbox("📅 Έτος:", options=user_regs['school_year'].unique().tolist())
+                    sel_prog = st.selectbox("📚 Πρόγραμμα:", options=user_regs['program'].unique().tolist())
+                    
+                    # --- ΥΠΟΛΟΓΙΣΜΟΣ ΥΠΟΛΟΙΠΟΥ (ΧΡΕΩΣΗ - ΠΛΗΡΩΜΕΝΑ) ---
+                    current_reg_row = user_regs[(user_regs['school_year'].astype(str) == str(sel_y)) & (user_regs['program'].astype(str) == str(sel_prog))]
+                    total_cost = 0.0
+                    if not current_reg_row.empty:
+                        adj_val = current_reg_row.iloc[0].get('adjusted_cost', 0)
+                        try:
+                            total_cost = float(str(adj_val).replace(',', '.') or 0.0)
+                        except:
+                            total_cost = 0.0
+
+                    paid_amount = 0.0
+                    if not pays_df.empty:
+                        pays_df.columns = pays_df.columns.astype(str).str.strip()
+                        mask_p = (
+                            (pays_df['id_customer'].astype(str).str.strip() == str(c_id)) &
+                            (pays_df['school_year'].astype(str).str.strip() == str(sel_y)) &
+                            (pays_df['program'].astype(str).str.strip().lower() == str(sel_prog).lower())
+                        )
+                        paid_amount = pd.to_numeric(pays_df.loc[mask_p, 'amount_paid'], errors='coerce').sum()
+
+                    remaining_balance = total_cost - paid_amount
+
+                    # Εμφάνιση καρτέλας υπολοίπου
+                    st.info(f"💰 **Συμφωνηθέν ποσό (adjusted_cost):** {total_cost:.2f}€ | 💸 **Έχει πληρώσει:** {paid_amount:.2f}€ | 📉 **Υπόλοιπο (Χρωστάει):** {remaining_balance:.2f}€")
+
+                    with st.form("pay"):
+                        rec = st.text_input("Αρ. Απόδειξης").strip()
+                        amt = st.number_input("Ποσό (€)", min_value=0.0, format="%.2f")
+                        pay_method = st.selectbox("Τρόπος", ["Μετρητά", "Εθνική", "Eurobank", "POS"])
+                        
+                        if st.form_submit_button("💾 Αποθήκευση"):
+                            if not rec or amt <= 0:
+                                st.warning("⚠️ Συμπληρώστε απόδειξη και ποσό!")
+                            else:
+                                try:
+                                    gc = get_gspread_client()
+                                    sh = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
+                                    records = sh.get_all_records()
+                                    next_id = int(pd.DataFrame(records)['id_payment'].max()) + 1 if records and 'id_payment' in pd.DataFrame(records).columns else 1
+                                    
+                                    sh.append_row([
+                                        next_id, c_id, str(row['customer_lastname']), str(row['customer_firstname']),
+                                        datetime.today().strftime('%Y-%m-%d'), rec, amt, str(sel_y), pay_method, str(sel_prog)
+                                    ])
+                                    check_and_update_status_to_finish(c_id, sel_y, sel_prog)
+                                    st.success("✅ Η πληρωμή καταχωρήθηκε!")
+                                    time.sleep(1.2)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Σφάλμα: {e}")
 
     elif st.session_state.page == "payment_history_report":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun()
