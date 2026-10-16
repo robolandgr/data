@@ -731,7 +731,7 @@ else:
                     remaining_balance = total_cost - paid_amount
 
                     # Εμφάνιση καρτέλας υπολοίπου
-                    st.info(f"💰 **Συμφωνηθέν ποσό (adjusted_cost):** {total_cost:.2f}€ | 💸 **Έχει πληρώσει:** {paid_amount:.2f}€ | 📉 **Υπόλοιπο (Χρωστάει):** {remaining_balance:.2f}€")
+                    st.info(f"💰 **Συμφωνηθέν ποσό:** {total_cost:.2f}€ | 💸 **Έχει πληρώσει:** {paid_amount:.2f}€ | 📉 **Υπόλοιπο:** {remaining_balance:.2f}€")
 
                     with st.form("pay"):
                         rec = st.text_input("Αρ. Απόδειξης").strip()
