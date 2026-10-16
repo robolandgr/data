@@ -340,7 +340,7 @@ else:
                 
         st.markdown("---")
         st.subheader("Διαχείριση Κέντρου")
-        if st.button("📚 Προγράμματα - Τμήματα - Καθηγητές", use_container_width=True):
+        if st.button("📚 Προγράμματα - Τμήματα", use_container_width=True):
             st.session_state.page = "add_structure"; st.rerun()
 
         st.markdown("---")
