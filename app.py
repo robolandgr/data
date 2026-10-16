@@ -714,17 +714,15 @@ else:
                         recs = sh.get_all_records()
                         nid = int(pd.DataFrame(recs)['id_payment'].max()) + 1 if recs and 'id_payment' in pd.DataFrame(recs).columns else 1
                         
-                        # Καταχώρηση πληρωμής, με το πρόγραμμα στη στήλη J (index 9)
                         sh.append_row([nid, c_id, row['customer_lastname'], row['customer_firstname'], datetime.today().strftime('%Y-%m-%d'), rec, amt, yr, "Μετρητά", prog])
                         
-                        # --- ΜΗΔΕΝΙΣΜΟΣ ADJUSTED_COST ΣΤΟ DB_REGISTRATIONS ΑΠΟ ΕΚΕΙΝΗ ΤΗ ΣΤΙΓΜΗ ---
                         try:
                             sh_reg = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
                             all_regs = sh_reg.get_all_values()
                             if len(all_regs) > 1:
                                 for ri, rvals in enumerate(all_regs[1:], start=2):
                                     if len(rvals) > 5 and str(rvals[1]).strip() == str(c_id) and str(rvals[4]).strip() == str(yr) and str(rvals[9]).strip().lower() == str(prog).lower():
-                                        sh_reg.update_cell(ri, 10, 0.0) # Μηδενισμός στήλης J/10 (adjusted_cost)
+                                        sh_reg.update_cell(ri, 10, 0.0)
                                         break
                         except Exception:
                             pass
@@ -773,7 +771,8 @@ else:
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun()
         st.subheader("Ανένταχτοι Πελάτες")
         cust = load_specific_db("db_customers")
-        .empty: st.dataframe(cust, use_container_width=True)
+        if not cust.empty: 
+            st.dataframe(cust, use_container_width=True)
 
     elif st.session_state.page == "complaints_page":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
