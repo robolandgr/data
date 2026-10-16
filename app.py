@@ -360,8 +360,6 @@ else:
             if st.session_state.role in ["employee", "admin", "master"]:
                 if st.button("📋 Μητρώο Πελατών", use_container_width=True):
                     st.session_state.page = "anafora_pelaton"; st.rerun()
-                if st.button("🏫 Αναφορά Καθηγητών & Τμημάτων", use_container_width=True):
-                    st.session_state.page = "teacher_report"; st.rerun()
         with col_r2:
             if st.button("🚫 Εκδήλωση Ενδιαφέροντος", use_container_width=True):
                 st.session_state.page = "unassigned_customers"; st.rerun()
