@@ -284,17 +284,17 @@ else:
         st.subheader("Παρουσιολόγιο & Πληρωμές")
         col_pr1, col_pr2 = st.columns(2)
         with col_pr1:
-            if st.button("✅ Παρουσιολόγιο (Τμήμα Ιδιωτικά)", use_container_width=True):
+            if st.button("✅ Παρουσιολόγιο", use_container_width=True):
                 st.session_state.page = "attendances_page"; st.rerun()
         with col_pr2:
-            if st.button("💳 Καταχώρηση Πληρωμής (Συνδρομή)", use_container_width=True):
+            if st.button("💳 Καταχώρηση Πληρωμής", use_container_width=True):
                 st.session_state.page = "add_payment"; st.rerun()
 
         st.markdown("---")
         st.subheader("Οικονομικά & Έξοδα")
         col_p1, col_p2 = st.columns(2)
         with col_p1:
-            if st.button("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή", use_container_width=True):
+            if st.button("📊 Οικονομική Αναφορά", use_container_width=True):
                 st.session_state.page = "payment_history_report"; st.rerun()
         with col_p2:
             if st.button("💸 Καταχώρηση Εξόδων", use_container_width=True):
