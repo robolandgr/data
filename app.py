@@ -495,3 +495,82 @@ else:
     else:
         st.session_state.page = "menu"
         st.rerun()
+
+# --- ΣΕΛΙΔΑ: ΕΠΕΞΕΡΓΑΣΙΑ ΣΤΟΙΧΕΙΩΝ ΜΑΘΗΤΗ ---
+    elif st.session_state.page == "customer_registry":
+        if st.button("⬅️ Μενού", key="menu_cust_reg_safe", use_container_width=True):
+            st.session_state.page = "menu"
+            st.rerun() 
+
+        st.subheader("Επεξεργασία Στοιχείων Μαθητή")
+        
+        cust_df = load_specific_db("db_customers")
+        
+        if cust_df.empty:
+            st.warning("⚠️ Η βάση δεδομένων μαθητών (`db_customers`) είναι επί του παρόντος κενή. Προσθέστε πρώτα έναν μαθητή από την επιλογή «Νέο Παιδί» στο κεντρικό μενού.")
+        else:
+            cust_df.columns = cust_df.columns.astype(str).str.strip()
+            cust_df['customer_lastname'] = cust_df['customer_lastname'].astype(str).str.strip()
+            cust_df['customer_firstname'] = cust_df['customer_firstname'].astype(str).str.strip()
+            cust_df['parent_firstname'] = cust_df['parent_firstname'].astype(str).str.strip()
+            cust_df['id_customer'] = pd.to_numeric(cust_df['id_customer'], errors='coerce').fillna(0).astype(int)
+
+            cust_df['dropdown'] = (cust_df['customer_lastname'] + " " + 
+                                   cust_df['customer_firstname'] + " (ΠΑΤΡΟΣ: " + 
+                                   cust_df['parent_firstname'] + " - ID: " + cust_df['id_customer'].astype(str) + ")")
+            
+            sel_cust = st.selectbox("🔍 Επιλογή Μαθητή για Επεξεργασία", ["-- Επιλέξτε --"] + cust_df['dropdown'].tolist(), key="sel_edit_reg_unique")
+
+            if sel_cust != "-- Επιλέξτε --":
+                selected_row = cust_df[cust_df['dropdown'] == sel_cust].iloc[0]
+                cust_id = str(selected_row['id_customer']).strip()
+                old_lname = str(selected_row['customer_lastname']).strip()
+                old_fname = str(selected_row['customer_firstname']).strip()
+
+                with st.form("edit_customer_form_safe"):
+                    col_e1, col_e2 = st.columns(2)
+                    with col_e1:
+                        new_fname = st.text_input("Όνομα", value=str(selected_row.get('customer_firstname', '')))
+                        new_lname = st.text_input("Επώνυμο", value=str(selected_row.get('customer_lastname', '')))
+                        new_tel = st.text_input("Τηλέφωνο", value=str(selected_row.get('telephone', '')))
+                        new_pfname = st.text_input("Όνομα Πατρός", value=str(selected_row.get('parent_firstname', '')))
+                        new_plname = st.text_input("Επώνυμο Πατρός", value=str(selected_row.get('parent_lastname', '')))
+
+                    with col_e2:
+                        new_email = st.text_input("Email", value=str(selected_row.get('email', '')))
+                        new_adr = st.text_input("Διεύθυνση", value=str(selected_row.get('address', '')))
+                        
+                        raw_date = selected_row.get('birthday_date')
+                        try:
+                            dt_val = pd.to_datetime(raw_date, errors='coerce')
+                            current_date = dt_val.date() if pd.notna(dt_val) else datetime(2015, 1, 1).date()
+                        except:
+                            current_date = datetime(2015, 1, 1).date()
+                        
+                        new_bd = st.date_input("Ημ. Γέννησης", value=current_date)
+
+                    if st.form_submit_button("💾 Αποθήκευση αλλαγών"):
+                        try:
+                            gc = get_gspread_client()
+                            sh_cust = gc.open(OLD_SHEET_NAME).worksheet("db_customers")
+                            cell = sh_cust.find(cust_id)
+                            
+                            if cell:
+                                row_idx = cell.row
+                                sh_cust.update_cell(row_idx, 2, uppercase_clean(new_fname))
+                                sh_cust.update_cell(row_idx, 3, uppercase_clean(new_lname))
+                                sh_cust.update_cell(row_idx, 4, uppercase_clean(new_pfname))
+                                sh_cust.update_cell(row_idx, 5, uppercase_clean(new_plname))
+                                sh_cust.update_cell(row_idx, 6, new_tel.strip())
+                                sh_cust.update_cell(row_idx, 7, str(new_email).strip().lower())
+                                sh_cust.update_cell(row_idx, 8, uppercase_clean(new_adr))
+                                sh_cust.update_cell(row_idx, 9, new_bd.strftime('%Y-%m-%d'))
+                                
+                                load_specific_db.clear()
+                                st.success("✅ Τα στοιχεία του μαθητή ενημερώθηκαν επιτυχώς!")
+                                time.sleep(1.2)
+                                st.rerun()
+                            else:
+                                st.error("Δεν βρέθηκε η εγγραφή στη βάση δεδομένων.")
+                        except Exception as e: 
+                            st.error(f"Σφάλμα αποθήκευσης: {e}")
