@@ -754,6 +754,27 @@ else:
                         def_energy_idx = energy_options.index(val_en)
                 sel_energy = st.selectbox("💡 Τύπος Πληρωμής (energy)", options=energy_options, index=def_energy_idx)
                 
+                # --- ΝΕΑ ΠΕΔΙΑ: ΒΑΡΔΙΑ & ΗΜΕΡΟΜΗΝΙΑ ΕΝΑΡΞΗΣ ---
+                bardia_options = ["Α Βάρδια", "Β Βάρδια"]
+                def_bardia_idx = 0
+                if reg_to_edit is not None and 'm_bardia' in reg_to_edit:
+                    val_bar = str(reg_to_edit['m_bardia']).strip()
+                    if val_bar in bardia_options:
+                        def_bardia_idx = bardia_options.index(val_bar)
+                sel_bardia = st.selectbox("🕒 Επιλογή Βάρδιας (M Bardia)", options=bardia_options, index=def_bardia_idx)
+
+                # Ημερομηνία Έναρξης
+                default_start_date = datetime.today()
+                if reg_to_edit is not None and 'start_date' in reg_to_edit:
+                    try:
+                        parsed_date = pd.to_datetime(reg_to_edit['start_date']).date()
+                        if not pd.isna(parsed_date):
+                            default_start_date = parsed_date
+                    except:
+                        pass
+                sel_start_date = st.date_input("📅 Ημερομηνία Έναρξης", value=default_start_date)
+                start_date_str = sel_start_date.strftime('%Y-%m-%d')
+                
                 if st.button("🚀 Οριστικοποίηση Εγγραφής"):
                     try:
                         gc = get_gspread_client()
@@ -762,7 +783,10 @@ else:
                         if mode == "Νέα Εγγραφή":
                             records = sh.get_all_records()
                             next_reg = int(pd.DataFrame(records)['id_registration'].max()) + 1 if records and 'id_registration' in pd.DataFrame(records).columns else 1
-                            # Σειρά πεδίων: id_registration, id_customer, customer_firstname, customer_lastname, school_year, program, class, status, stop_date, adjusted_cost, energy, xreos
+                            # Σειρά πεδίων: 
+                            # 1: id_registration, 2: id_customer, 3: customer_firstname, 4: customer_lastname, 
+                            # 5: school_year, 6: program, 7: class, 8: status, 9: stop_date, 
+                            # 10: adjusted_cost, 11: energy, 12: xreos, 13: m_bardia, 14: start_date
                             row_data = [
                                 next_reg, 
                                 int(c_id), 
@@ -775,22 +799,24 @@ else:
                                 "", 
                                 adj_cost, 
                                 sel_energy, 
-                                0.0
+                                0.0,
+                                str(sel_bardia),
+                                str(start_date_str)
                             ]
                             sh.append_row(row_data)
                         else:
                             target_reg_id = str(reg_to_edit['id_registration']).strip()
                             all_rows = sh.get_all_values()
-                            header = [h.strip().lower() for h in all_rows[0]]
                             
                             for r_idx, s_row in enumerate(all_rows[1:], start=2):
                                 if str(s_row[0]).strip() == target_reg_id:
-                                    # Ενημέρωση πεδίων δυναμικά ή με βάση τη σειρά
                                     sh.update_cell(r_idx, 5, str(s_year))         # school_year (στήλη Ε / 5)
                                     sh.update_cell(r_idx, 6, str(s_prog))         # program (στήλη ΣΤ / 6)
                                     sh.update_cell(r_idx, 7, str(sel_class))      # class (στήλη Ζ / 7)
                                     sh.update_cell(r_idx, 10, adj_cost)       # adjusted_cost (στήλη Ι / 10)
                                     sh.update_cell(r_idx, 11, sel_energy)     # energy (στήλη Κ / 11)
+                                    sh.update_cell(r_idx, 13, str(sel_bardia))    # m_bardia (στήλη Μ / 13)
+                                    sh.update_cell(r_idx, 14, str(start_date_str))# start_date (στήλη Ν / 14)
                                     break
                                     
                         st.success("✅ Η εγγραφή/τροποποίηση καταχωρήθηκε επιτυχώς!")
