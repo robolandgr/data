@@ -241,55 +241,67 @@ else:
         col_c1, col_c2 = st.columns(2)
         with col_c1:
             if st.button("➕ Νέος Πελάτης (Πρώτη Εγγραφή)", use_container_width=True):
-                st.session_state.page = "register"; st.rerun()
+                st.session_state.page = "register"
+                st.rerun()
             if st.button("📋 Επεξεργασία Στοιχείων Πελατών", use_container_width=True):
-                st.session_state.page = "customer_registry"; st.rerun()
+                st.session_state.page = "customer_registry"
+                st.rerun()
         with col_c2:
             if st.button("👥 Διαχείριση Κατάστασης Πελατών (STOP/Επαναφορά)", use_container_width=True):
-                st.session_state.page = "view_customers"; st.rerun()
+                st.session_state.page = "view_customers"
+                st.rerun()
             if st.button("🔄 Εισαγωγή Πελάτη σε Τμήμα", use_container_width=True):
-                st.session_state.page = "renew_registration"; st.rerun()
+                st.session_state.page = "renew_registration"
+                st.rerun()
 
         st.markdown("---")
         st.subheader("Παρουσιολόγιο & Πληρωμές")
         col_pr1, col_pr2 = st.columns(2)
         with col_pr1:
             if st.button("✅ Παρουσιολόγιο (Τμήμα Ιδιωτικά)", use_container_width=True):
-                st.session_state.page = "attendances_page"; st.rerun()
+                st.session_state.page = "attendances_page"
+                st.rerun()
         with col_pr2:
             if st.button("💳 Καταχώρηση Πληρωμής (Συνδρομή)", use_container_width=True):
-                st.session_state.page = "add_payment"; st.rerun()
+                st.session_state.page = "add_payment"
+                st.rerun()
 
         st.markdown("---")
         st.subheader("Οικονομικά & Έξοδα")
         col_p1, col_p2 = st.columns(2)
         with col_p1:
             if st.button("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή", use_container_width=True):
-                st.session_state.page = "payment_history_report"; st.rerun()
+                st.session_state.page = "payment_history_report"
+                st.rerun()
         with col_p2:
             if st.button("💸 Καταχώρηση Εξόδων", use_container_width=True):
-                st.session_state.page = "corp_payments"; st.rerun()
+                st.session_state.page = "corp_payments"
+                st.rerun()
 
         st.markdown("---")
         st.subheader("Διαχείριση Κέντρου")
         if st.button("📚 Προγράμματα - Τμήματα", use_container_width=True):
-            st.session_state.page = "add_structure"; st.rerun()
+            st.session_state.page = "add_structure"
+            st.rerun()
 
         st.markdown("---")
         st.subheader("Αναφορές")
         col_r1, col_r2 = st.columns(2)
         with col_r1:
             if st.button("📋 Μητρώο Πελατών", use_container_width=True):
-                st.session_state.page = "anafora_pelaton"; st.rerun()
+                st.session_state.page = "anafora_pelaton"
+                st.rerun()
         with col_r2:
             if st.button("📅 Μηνιαία Αναφορά Παρουσίων", use_container_width=True):
-                st.session_state.page = "monthly_attendance_report"; st.rerun()
+                st.session_state.page = "monthly_attendance_report"
+                st.rerun()
 
         st.markdown("---")
         st.markdown("##### 🔗 Διαχείριση Παραπόνων & Σχολίων")
         if st.button("🛠️ Εισαγωγή/ Τροποποίηση Παραπόνων & Σχολίων", use_container_width=True):
-            st.session_state.page = "complaints_page"; st.rerun()
-
+            st.session_state.page = "complaints_page"
+            st.rerun()
+#----------------------------------------------------------------
     # --- ΣΕΛΙΔΑ: ΠΑΡΟΥΣΙΟΛΟΓΙΟ ---
     elif st.session_state.page == "attendances_page":
         if st.button("⬅️ Μενού", use_container_width=True):
