@@ -842,7 +842,7 @@ else:
         reg_df = load_specific_db("db_registrations")
         
         if not cust_df.empty:
-            # Αλφαβητική ταξινόμηση πελατών βάσει επωνύμου και ονόματος
+            # Αλφαβητική ταξινόμηση πελατών βάσει επωνύμου
             if 'customer_lastname' in cust_df.columns and 'customer_firstname' in cust_df.columns:
                 cust_df = cust_df.sort_values(by=['customer_lastname', 'customer_firstname'], ascending=[True, True])
 
@@ -853,7 +853,6 @@ else:
                 row = cust_df[cust_df['display'] == sel].iloc[0]
                 c_id = str(row['id_customer']).strip()
                 
-                # Ανάγνωση εγγραφών του πελάτη από το db_registrations
                 user_regs = pd.DataFrame()
                 if not reg_df.empty:
                     reg_df.columns = reg_df.columns.astype(str).str.strip()
@@ -867,7 +866,7 @@ else:
                     yr = st.selectbox("📅 Έτος", options=user_regs['school_year'].dropna().unique().tolist())
                     prog = st.selectbox("📚 Πρόγραμμα", options=user_regs[prog_col_name].dropna().unique().tolist())
                     
-                    # Εντοπισμός της συγκεκριμένης εγγραφής για να πάρουμε το adjusted_cost και το xreos (στήλη L / index 11)
+                    # Εντοπισμός της εγγραφής για το adjusted_cost και το xreos (στήλη L / index 11)
                     current_reg = user_regs[(user_regs['school_year'].astype(str).str.strip() == str(yr)) & (user_regs[prog_col_name].astype(str).str.strip() == str(prog))]
                     
                     adjusted_val = 0.0
@@ -875,18 +874,15 @@ else:
                     
                     if not current_reg.empty:
                         r_item = current_reg.iloc[0]
-                        # adjusted_cost
                         adj_str = str(r_item.get('adjusted_cost', 0)).replace(',', '.')
                         try: adjusted_val = float(adj_str) if adj_str.strip() != '' else 0.0
                         except: adjusted_val = 0.0
                         
-                        # xreos (πεδίο L / index 11 ή αναζήτηση με όνομα)
                         xreos_raw = r_item.iloc[11] if len(r_item) > 11 else r_item.get('xreos', 0)
                         xreos_str = str(xreos_raw).replace(',', '.')
                         try: xreos_val = float(xreos_str) if xreos_str.strip() != '' else 0.0
                         except: xreos_val = 0.0
 
-                    # Εμφάνιση πληροφοριών συμφωνηθέντος ποσού και τρέχοντος χρέους (xreos)
                     st.info(f"💰 **Συμφωνηθέν Ποσό (adjusted_cost):** {adjusted_val:.2f}€ | 📉 **Τρέχον Χρέος (xreos):** {xreos_val:.2f}€")
 
                     with st.form("pay"):
@@ -904,6 +900,7 @@ else:
                                     recs = sh.get_all_records()
                                     nid = int(pd.DataFrame(recs)['id_payment'].max()) + 1 if recs and 'id_payment' in pd.DataFrame(recs).columns else 1
                                     
+                                    # Στήλη J (index 9) περιέχει πλέον το σχολικό έτος (yr)
                                     sh.append_row([
                                         nid, 
                                         int(c_id), 
@@ -912,13 +909,13 @@ else:
                                         datetime.today().strftime('%Y-%m-%d'), 
                                         rec, 
                                         amt, 
-                                        str(yr), 
+                                        str(prog),         # Προηγούμενο πεδίο ή θέση
                                         pay_method, 
-                                        str(prog)
+                                        str(yr)            # Στήλη J: school_year
                                     ])
                                     
                                     check_and_update_status_to_finish(int(c_id), yr, prog)
-                                    st.success("✅ Η πληρωμή καταχωρήθηκε επιτυχώς!")
+                                    st.success("✅ Η πληρωμή καταχωρήθηκε επιτυχώς με ενημέρωση του σχολικού έτους στη στήλη J!")
                                     time.sleep(1.2)
                                     st.rerun()
                                 except Exception as e:
