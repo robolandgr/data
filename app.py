@@ -455,7 +455,7 @@ else:
 
         st.subheader("✅ Παρουσιολόγιο (Τμήμα: Ιδιωτικά)")
         
-        # Επιλογή Σχολικού Έτους (Διασφαλίζει ότι ανάλογα με το έτος φέρνει τους αντίστοιχους μαθητές)
+        # Επιλογή Σχολικού Έτους
         years_options = ["2026-2027", "2027-2028", "2028-2029", "2029-2030"]
         selected_year_att = st.selectbox("📅 Επιλογή Σχολικού Έτους", options=years_options)
         
@@ -495,6 +495,7 @@ else:
                 with st.form("attendance_form"):
                     st.markdown(f"#### Λίστα Μαθητών - {target_date_str}")
                     attendance_inputs = {}
+                    pdf_preview_rows = []
 
                     for idx, r in priv_regs.iterrows():
                         c_id = str(r['id_customer']).strip()
@@ -538,6 +539,12 @@ else:
                             'lname': lname
                         }
 
+                        pdf_preview_rows.append({
+                            'name': f"{lname} {fname} (ID: {c_id})",
+                            'prog': prog_name,
+                            'status': "ΝΑΙ" if val else "ΟΧΙ"
+                        })
+
                     if st.form_submit_button("💾 Αποθήκευση Παρουσιολογίου & Υπολογισμός Χρέους"):
                         try:
                             gc = get_gspread_client()
@@ -553,13 +560,11 @@ else:
                             next_att_id = int(pd.DataFrame(att_records)['id_attendance'].max()) + 1 if att_records and 'id_attendance' in pd.DataFrame(att_records).columns else 1
                             
                             sh_reg = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
-                            all_reg_rows = sh_reg.get_all_values()
 
                             # 2. Ενημέρωση παρουσιών ανά μαθητή
                             for c_id, data in attendance_inputs.items():
                                 status_str = "ΝΑΙ" if data['val'] else "ΟΧΙ"
                                 
-                                # Αποθήκευση/Ενημέρωση στο db_attendances
                                 found_att = False
                                 if att_records:
                                     for ai, a_row in enumerate(att_records, start=2):
@@ -575,7 +580,6 @@ else:
                                 current_att_df = pd.DataFrame(sh_att.get_all_records())
                                 if not current_att_df.empty:
                                     current_att_df.columns = current_att_df.columns.astype(str).str.strip()
-                                    # Φιλτράρουμε τις παρουσίες του μαθητή για το επιλεγμένο έτος που είναι "ΝΑΙ"
                                     user_total_nais = current_att_df[
                                         (current_att_df['id_customer'].astype(str).str.strip() == c_id) &
                                         (current_att_df['school_year'].astype(str).str.strip() == selected_year_att) &
@@ -596,7 +600,8 @@ else:
                             st.rerun()
                         except Exception as e:
                             st.error(f"Σφάλμα αποθήκευσης παρουσιών: {e}")
-                    # Κουμπί εξαγωγής/εκτύπωσης σε PDF εκτός της φόρμας για άμεση λήψη
+
+                # Κουμπί εξαγωγής/εκτύπωσης σε PDF εκτός της φόρμας για άμεση λήψη οποιουδήποτε παρουσιολογίου
                 st.markdown("<br>", unsafe_allow_html=True)
                 pdf_bytes = generate_single_attendance_pdf(pdf_preview_rows, target_date_str, selected_year_att)
                 if pdf_bytes:
