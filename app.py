@@ -730,11 +730,94 @@ else:
                         except Exception as e:
                             st.error(f"Σφάλμα ενημέρωσης: {e}")
 #---------------------------------------------------------------------------------------------------------
+    # --- ΣΕΛΙΔΑ: ΔΙΑΧΕΙΡΙΣΗ STOP ---
     elif st.session_state.page == "view_customers":
-        if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun()
-        st.subheader("Διαχείριση STOP")
+        if st.button("⬅️ Μενού", use_container_width=True): 
+            st.session_state.page = "menu"
+            st.rerun()
+
+        st.subheader("Διαχείριση STOP & Κατάστασης Εγγραφών")
         reg_df = load_specific_db("db_registrations")
-        if not reg_df.empty: st.dataframe(reg_df, use_container_width=True, hide_index=True)
+        cust_df = load_specific_db("db_customers")
+
+        if reg_df.empty:
+            st.info("Δεν βρέθηκαν εγγραφές στο `db_registrations`.")
+        else:
+            reg_df.columns = reg_df.columns.astype(str).str.strip()
+            
+            # Αντικατάσταση ή προσθήκη ονοματεπωνύμων από το db_customers για αλφαβητική ταξινόμηση
+            if not cust_df.empty:
+                cust_df.columns = cust_df.columns.astype(str).str.strip()
+                cust_df['customer_lastname'] = cust_df['customer_lastname'].astype(str).str.strip()
+                cust_df['customer_firstname'] = cust_df['customer_firstname'].astype(str).str.strip()
+                cust_df = cust_df.sort_values(by=['customer_lastname', 'customer_firstname'], ascending=[True, True])
+                
+                cust_df['display'] = cust_df['customer_lastname'] + " " + cust_df['customer_firstname'] + " (ID: " + cust_df['id_customer'].astype(str) + ")"
+                sel_cust = st.selectbox("🔍 Επιλογή Πελάτη", options=["-- Επιλέξτε --"] + cust_df['display'].tolist())
+
+                if sel_cust != "-- Επιλέξτε --":
+                    row_c = cust_df[cust_df['display'] == sel_cust].iloc[0]
+                    c_id = str(row_c['id_customer']).strip()
+                    
+                    user_regs = reg_df[reg_df['id_customer'].astype(str).str.strip() == c_id]
+                    if user_regs.empty:
+                        st.warning("Ο συγκεκριμένος πελάτης δεν έχει καμία εγγραφή.")
+                    else:
+                        user_regs['display_reg'] = user_regs['school_year'].astype(str) + " - " + user_regs['program'].astype(str) + " (" + user_regs['class'].astype(str) + ")"
+                        sel_reg_str = st.selectbox("📚 Επιλογή Εγγραφής / Τμήματος", options=user_regs['display_reg'].tolist())
+                        reg_row = user_regs[user_regs['display_reg'] == sel_reg_str].iloc[0]
+                        
+                        target_reg_id = str(reg_row['id_registration']).strip()
+                        
+                        current_status = str(reg_row.get('status', 'Active')).strip()
+                        status_options = ["Active", "Stop"]
+                        def_status_idx = status_options.index(current_status) if current_status in status_options else 0
+                        
+                        current_cost = 0.0
+                        try:
+                            current_cost = float(str(reg_row.get('adjusted_cost', 0)).replace(',', '.') or 0.0)
+                        except:
+                            current_cost = 0.0
+
+                        current_stop_date = str(reg_row.get('stop_date', '')).strip()
+                        parsed_date = datetime.today()
+                        if current_stop_date:
+                            try:
+                                parsed_date = datetime.strptime(current_stop_date, '%Y-%m-%d')
+                            except:
+                                pass
+
+                        with st.form("stop_edit_form"):
+                            st.markdown(f"**Επεξεργασία Εγγραφής ID:** {target_reg_id}")
+                            new_status = st.selectbox("📌 Κατάσταση (Status)", options=status_options, index=def_status_idx)
+                            new_cost = st.number_input("💰 Συμφωνηθέν Ποσό (adjusted_cost) (€)", value=current_cost, step=10.0, format="%.2f")
+                            
+                            # Αν επιλεγεί Stop, ενημερώνεται η stop_date
+                            new_stop_date = st.date_input("📅 Ημερομηνία Σταματήματος (stop_date)", value=parsed_date)
+                            
+                            if st.form_submit_button("💾 Αποθήκευση Αλλαγών"):
+                                try:
+                                    gc = get_gspread_client()
+                                    sh_reg = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
+                                    all_rows = sh_reg.get_all_values()
+                                    
+                                    stop_date_str = new_stop_date.strftime('%Y-%m-%d') if new_status.lower() == 'stop' else ""
+                                    
+                                    for r_idx, s_row in enumerate(all_rows[1:], start=2):
+                                        if str(s_row[0]).strip() == target_reg_id:
+                                            # Στήλη H / index 7 -> status, Στήλη I / index 8 -> stop_date, Στήλη J / index 9 -> adjusted_cost
+                                            sh_reg.update_cell(r_idx, 8, new_status)
+                                            sh_reg.update_cell(r_idx, 9, stop_date_str)
+                                            sh_reg.update_cell(r_idx, 10, new_cost)
+                                            break
+                                            
+                                    st.success("✅ Η κατάσταση και τα οικονομικά στοιχεία ενημερώθηκαν επιτυχώς!")
+                                    time.sleep(1.2)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Σφάλμα ενημέρωσης: {e}")
+            else:
+                st.dataframe(reg_df, use_container_width=True, hide_index=True)
 #---------------------------------------------------------------------------------------------------------
     elif st.session_state.page == "add_payment":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
