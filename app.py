@@ -1018,7 +1018,7 @@ else:
             
         st.subheader("📚 Διαχείριση Προγραμμάτων & Τμημάτων")
         
-        tab1, tab2 = st.tabs(["🏫 Τμήματα (Classes)", "📚 Προγράμματα (Programs)"])
+        tab1= st.tabs(["🏫 Τμήματα (Classes)"])
         
         with tab1:
             st.markdown("#### Δημιουργία Νέου Τμήματος")
