@@ -1016,78 +1016,72 @@ else:
             st.session_state.page = "menu"
             st.rerun() 
             
-        st.subheader("📚 Διαχείριση Προγραμμάτων & Τμημάτων")
+        st.subheader("📚 Διαχείριση Τμημάτων")
         
-        tab1= st.tabs(["🏫 Τμήματα (Classes)"])
+        progs_df = load_specific_db("db_programs")
+        prog_options = progs_df['program_name'].tolist() if not progs_df.empty else []
         
-        with tab1:
-            st.markdown("#### Δημιουργία Νέου Τμήματος")
-            progs_df = load_specific_db("db_programs")
-            prog_options = progs_df['program_name'].tolist() if not progs_df.empty else []
+        st.markdown("#### Δημιουργία Νέου Τμήματος")
+        with st.form("new_class_form", clear_on_submit=True):
+            new_class_name = st.text_input("Όνομα Νέου Τμήματος (π.χ. Τμήμα Α, Group 1)").strip()
             
-            with st.form("new_class_form", clear_on_submit=True):
-                new_class_name = st.text_input("Όνομα Νέου Τμήματος (π.χ. Τμήμα Α, Group 1)").strip()
-                
-                # Επιλογή Προγράμματος
-                sel_prog_for_class = st.selectbox("📚 Επιλογή Προγράμματος", options=prog_options if prog_options else ["-- Κανένα Πρόγραμμα --"])
-                
-                # Επιλογή Σχολικού Έτους
-                year_options = [f"{y}-{y+1}" for y in range(2026, 2030)]
-                sel_year_for_class = st.selectbox("📅 Σχολικό Έτος", options=year_options)
-                
-                if st.form_submit_button("💾 Αποθήκευση Τμήματος"):
-                    if not new_class_name:
-                        st.warning("⚠️ Συμπληρώστε το όνομα του τμήματος!")
-                    else:
-                        try:
-                            # --- ΑΥΤΟΜΑΤΟΣ ΥΠΟΛΟΓΙΣΜΟΣ ΗΜΕΡΟΜΗΝΙΩΝ ---
-                            # Από το "2026-2027" παίρνουμε το 2026 για την έναρξη και το 2027 για τη λήξη
-                            start_year_str = sel_year_for_class.split("-")[0]
-                            end_year_str = "20" + sel_year_for_class.split("-")[1] if len(sel_year_for_class.split("-")[1]) == 2 else str(int(start_year_str) + 1)
-                            
-                            auto_start_date = f"{start_year_str}-09-01"
-                            auto_end_date = f"{end_year_str}-07-31"
+            # Επιλογή Προγράμματος
+            sel_prog_for_class = st.selectbox("📚 Επιλογή Προγράμματος", options=prog_options if prog_options else ["-- Κανένα Πρόγραμμα --"])
+            
+            # Επιλογή Σχολικού Έτους
+            year_options = [f"{y}-{y+1}" for y in range(2026, 2030)]
+            sel_year_for_class = st.selectbox("📅 Σχολικό Έτος", options=year_options)
+            
+            if st.form_submit_button("💾 Αποθήκευση Τμήματος"):
+                if not new_class_name:
+                    st.warning("⚠️ Συμπληρώστε το όνομα του τμήματος!")
+                else:
+                    try:
+                        # --- ΑΥΤΟΜΑΤΟΣ ΥΠΟΛΟΓΙΣΜΟΣ ΗΜΕΡΟΜΗΝΙΩΝ ---
+                        start_year_str = sel_year_for_class.split("-")[0]
+                        end_year_str = "20" + sel_year_for_class.split("-")[1] if len(sel_year_for_class.split("-")[1]) == 2 else str(int(start_year_str) + 1)
+                        
+                        auto_start_date = f"{start_year_str}-09-01"
+                        auto_end_date = f"{end_year_str}-07-31"
 
-                            gc = get_gspread_client()
-                            sh_c = gc.open(OLD_SHEET_NAME).worksheet("db_class")
-                            c_rows = sh_c.get_all_values()
-                            next_c_id = 1
-                            if len(c_rows) > 1:
-                                ids = [int(r[0]) for r in c_rows[1:] if r and r[0].isdigit()]
-                                if ids:
-                                    next_c_id = max(ids) + 1
-                            
-                            # Αποθήκευση: id, όνομα τμήματος, πρόγραμμα, σχολικό έτος, start_date, end_date
-                            sh_c.append_row([
-                                next_c_id, 
-                                uppercase_clean(new_class_name), 
-                                str(sel_prog_for_class), 
-                                str(sel_year_for_class), 
-                                auto_start_date, 
-                                auto_end_date
-                            ])
-                            
-                            st.success(f"✅ Το τμήμα '{new_class_name}' δημιουργήθηκε επιτυχώς! (Έναρξη: {auto_start_date} | Λήξη: {auto_end_date})")
-                            time.sleep(1.5)
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Σφάλμα αποθήκευσης τμήματος: {e}")
-            
-            st.markdown("---")
-            st.markdown("#### Υπάρχοντα Τμήματα")
-            c_df = load_specific_db("db_class")
-            if not c_df.empty:
-                st.dataframe(c_df, use_container_width=True, hide_index=True)
-            else:
-                st.info("Δεν βρέθηκαν τμήματα.")
-            
-            st.markdown("---")
-            st.markdown("#### Υπάρχοντα Προγράμματα")
-            p_df = load_specific_db("db_programs")
-            if not p_df.empty:
-                st.dataframe(p_df, use_container_width=True, hide_index=True)
-            else:
-                st.info("Δεν βρέθηκαν προγράμματα.")
+                        gc = get_gspread_client()
+                        sh_c = gc.open(OLD_SHEET_NAME).worksheet("db_class")
+                        c_rows = sh_c.get_all_values()
+                        next_c_id = 1
+                        if len(c_rows) > 1:
+                            ids = [int(r[0]) for r in c_rows[1:] if r and r[0].isdigit()]
+                            if ids:
+                                next_c_id = max(ids) + 1
+                        
+                        sh_c.append_row([
+                            next_c_id, 
+                            uppercase_clean(new_class_name), 
+                            str(sel_prog_for_class), 
+                            str(sel_year_for_class), 
+                            auto_start_date, 
+                            auto_end_date
+                        ])
+                        
+                        st.success(f"✅ Το τμήμα '{new_class_name}' δημιουργήθηκε επιτυχώς! (Έναρξη: {auto_start_date} | Λήξη: {auto_end_date})")
+                        time.sleep(1.5)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Σφάλμα αποθήκευσης τμήματος: {e}")
+        
+        st.markdown("---")
+        st.markdown("#### Υπάρχοντα Τμήματα")
+        c_df = load_specific_db("db_class")
+        if not c_df.empty:
+            st.dataframe(c_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("Δεν βρέθηκαν τμήματα.")
+
+        st.markdown("---")
+        st.markdown("#### Υπάρχοντα Προγράμματα")
+        if not progs_df.empty:
+            st.dataframe(progs_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("Δεν βρέθηκαν προγράμματα.")
 #------------------------------------------------------------------------
     elif st.session_state.page == "anafora_pelaton":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
