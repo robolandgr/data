@@ -988,11 +988,95 @@ else:
                                     except Exception as e:
                                         st.error(f"Σφάλμα κατά την αποθήκευση: {e}")
 #------------------------------------------------------------------------------------
+    # --- ΣΕΛΙΔΑ: ΑΝΑΦΟΡΑ & ΙΣΤΟΡΙΚΟ ΠΛΗΡΩΜΩΝ ΜΑΘΗΤΗ ---
     elif st.session_state.page == "payment_history_report":
-        if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun()
-        st.subheader("Ιστορικό Πληρωμών")
-        pays = load_specific_db("db_payments")
-        if not pays.empty: st.dataframe(pays, use_container_width=True, hide_index=True)
+        if st.button("⬅️ Μενού", use_container_width=True): 
+            st.session_state.page = "menu"
+            st.rerun()
+
+        st.subheader("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή")
+        
+        pays_df = load_specific_db("db_payments")
+        cust_df = load_specific_db("db_customers")
+        regs_df = load_specific_db("db_registrations")
+
+        if cust_df.empty:
+            st.info("Δεν βρέθηκαν δεδομένα πελατών.")
+        else:
+            # Αλφαβητική ταξινόμηση πελατών βάσει επωνύμου
+            if 'customer_lastname' in cust_df.columns and 'customer_firstname' in cust_df.columns:
+                cust_df = cust_df.sort_values(by=['customer_lastname', 'customer_firstname'], ascending=[True, True])
+
+            cust_df['display'] = cust_df['customer_lastname'].astype(str) + " " + cust_df['customer_firstname'].astype(str) + " (ID: " + cust_df['id_customer'].astype(str) + ")"
+            sel_cust = st.selectbox("🔍 Επιλογή Μαθητή / Πελάτη", options=["-- Επιλέξτε --"] + cust_df['display'].tolist())
+
+            if sel_cust != "-- Επιλέξτε --":
+                row_c = cust_df[cust_df['display'] == sel_cust].iloc[0]
+                c_id = str(row_c['id_customer']).strip()
+                cust_full_name = f"{row_c.get('customer_lastname', '')} {row_c.get('customer_firstname', '')}"
+
+                # Φίλτρα Σχολικού Έτους και Τμήματος (Class) από το db_registrations
+                user_regs = pd.DataFrame()
+                if not regs_df.empty:
+                    regs_df.columns = regs_df.columns.astype(str).str.strip()
+                    user_regs = regs_df[regs_df['id_customer'].astype(str).str.strip() == c_id]
+
+                col_f1, col_f2 = st.columns(2)
+                
+                available_years = ["ΟΛΑ"] + (sorted(user_regs['school_year'].dropna().astype(str).unique().tolist(), reverse=True) if not user_regs.empty else ["2026-2027", "2027-2028"])
+                sel_year_rep = col_f1.selectbox("📅 Φίλτρο Σχολικού Έτους", options=available_years)
+
+                available_classes = ["ΟΛΑ"] + (sorted(user_regs['class'].dropna().astype(str).unique().tolist()) if not user_regs.empty else ["Ιδιωτικά", "Voucher"])
+                sel_class_rep = col_f2.selectbox("🏫 Φίλτρο Τμήματος (Class)", options=available_classes)
+
+                # Φιλτράρισμα πληρωμών
+                if pays_df.empty:
+                    st.info("Δεν υπάρχουν καταχωρημένες πληρωμές στη βάση.")
+                else:
+                    pays_df.columns = pays_df.columns.astype(str).str.strip()
+                    cust_pays = pays_df[pays_df['id_customer'].astype(str).str.strip() == c_id].copy()
+
+                    if cust_pays.empty:
+                        st.info(f"Ο μαθητής {cust_full_name} δεν έχει καμία καταχωρημένη πληρωμή.")
+                    else:
+                        # Εφαρμογή φίλτρου έτους αν δεν είναι ΟΛΑ
+                        if sel_year_rep != "ΟΛΑ":
+                            if 'school_year' in cust_pays.columns:
+                                cust_pays = cust_pays[cust_pays['school_year'].astype(str).str.strip() == sel_year_rep]
+
+                        # Αν υπάρχει φίλτρο τμήματος, το συνδεόμαστε μέσω των εγγραφών
+                        if sel_class_rep != "ΟΛΑ" and not user_regs.empty:
+                            valid_years_for_class = user_regs[user_regs['class'].astype(str).str.strip().str.lower() == sel_class_rep.strip().lower()]['school_year'].astype(str).str.strip().tolist()
+                            cust_pays = cust_pays[cust_pays['school_year'].astype(str).str.strip().isin(valid_years_for_class)]
+
+                        if cust_pays.empty:
+                            st.info("Δεν βρέθηκαν πληρωμές με τα επιλεγμένα φίλτρα.")
+                        else:
+                            # Μετονομασία στηλών για την παρουσίαση/PDF
+                            display_pays = pd.DataFrame({
+                                'Ημερομηνία': cust_pays.get('payment_date', ''),
+                                'Αρ. Απόδειξης': cust_pays.get('receipt_number', ''),
+                                'Έτος': cust_pays.get('school_year', ''),
+                                'Τρόπος': cust_pays.get('pay_method', ''),
+                                'Ποσό (€)': pd.to_numeric(cust_pays.get('amount_paid', 0), errors='coerce').fillna(0)
+                            })
+
+                            st.markdown(f"#### 📄 Ιστορικό Πληρωμών για: **{cust_full_name}**")
+                            st.dataframe(display_pays, use_container_width=True, hide_index=True)
+
+                            total_paid = display_pays['Ποσό (€)'].sum()
+                            st.success(f"💰 **Συνολικό Πσό Πληρωμών:** {total_paid:.2f} €")
+
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            if st.button("📥 Παραγωγή PDF Ιστορικού Πληρωμών"):
+                                pdf_buffer = generate_customer_payment_history_pdf(cust_full_name, sel_year_rep, display_pays)
+                                if pdf_buffer:
+                                    st.download_button(
+                                        label="📥 Κατεβάστε το PDF Ιστορικού",
+                                        data=pdf_buffer,
+                                        file_name=f"istoriko_pliromon_{c_id}.pdf",
+                                        mime="application/pdf"
+                                    )
 #------------------------------------------------------------------------------------
     elif st.session_state.page == "corp_payments":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
