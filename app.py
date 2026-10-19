@@ -156,6 +156,51 @@ def generate_customer_payment_history_pdf(customer_name, selected_year, payments
     buffer.seek(0)
     return buffer
 
+def remove_accents(input_str):
+    if not isinstance(input_str, str): return str(input_str)
+    nfkd_form = unicodedata.normalize('NFKD', input_str)
+    return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
+
+def generate_report_pdf_customers(report_df, selected_year="ΟΛΑ"):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    story = []
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=15, alignment=1, textColor=colors.HexColor('#1F2937'), fontName='Helvetica-Bold')
+    subtitle_style = ParagraphStyle('SubTitle', parent=styles['Normal'], fontSize=11, alignment=1, spaceAfter=20, textColor=colors.HexColor('#4B5563'), fontName='Helvetica-Bold')
+    label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=8.5, fontName='Helvetica-Bold', textColor=colors.HexColor('#4B5563'))
+    value_style = ParagraphStyle('Value', parent=styles['Normal'], fontSize=9.5, fontName='Helvetica-Bold', textColor=colors.HexColor('#111827'))
+    name_style = ParagraphStyle('Name', parent=styles['Normal'], fontSize=11, fontName='Helvetica-Bold', textColor=colors.HexColor('#1F2937'))
+
+    story.append(Paragraph("ΜΗΤΡΩΟ ΠΕΛΑΤΩΝ & ΕΓΓΡΑΦΩΝ", title_style))
+    story.append(Paragraph(f"ΦΙΛΤΡΑ: ΕΤΟΣ: {remove_accents(str(selected_year).upper())}", subtitle_style))
+    story.append(Spacer(1, 10))
+
+    for _, row in report_df.iterrows():
+        lname = remove_accents(str(row.get('customer_lastname', '')).upper())
+        fname = remove_accents(str(row.get('customer_firstname', '')).upper())
+        year = remove_accents(str(row.get('school_year', '')).upper())
+        prog = remove_accents(str(row.get('program', '')).upper())
+        u_class = remove_accents(str(row.get('class', '')).upper())
+        status = remove_accents(str(row.get('status', '')).upper())
+
+        row_data = [
+            [Paragraph("ΜΑΘΗΤΗΣ:", label_style), Paragraph("ΣΧΟΛΙΚΟ ΕΤΟΣ:", label_style), Paragraph("ΚΑΤΑΣΤΑΣΗ:", label_style)],
+            [Paragraph(f"{lname} {fname}", name_style), Paragraph(year, value_style), Paragraph(status, value_style)],
+            [Paragraph("ΠΡΟΓΡΑΜΜΑ:", label_style), Paragraph("ΤΜΗΜΑ:", label_style), Paragraph("", label_style)],
+            [Paragraph(prog, value_style), Paragraph(u_class, value_style), Paragraph("", value_style)]
+        ]
+        
+        t = Table(row_data, colWidths=[270, 135, 135])
+        t.setStyle(TableStyle([('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#E5E7EB')), ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#F3F4F6')), ('TOPPADDING', (0, 0), (-1, -1), 6), ('BOTTOMPADDING', (0, 0), (-1, -1), 6)]))
+        story.append(t)
+        story.append(Spacer(1, 10))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
 def generate_monthly_attendances_pdf(report_df, month_str, year_str):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
