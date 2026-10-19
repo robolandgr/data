@@ -1028,10 +1028,10 @@ else:
             with st.form("new_class_form", clear_on_submit=True):
                 new_class_name = st.text_input("Όνομα Νέου Τμήματος (π.χ. Τμήμα Α, Group 1)").strip()
                 
-                # Επιλογή Προγράμματος στο οποίο θα ανήκει το τμήμα
+                # Επιλογή Προγράμματος
                 sel_prog_for_class = st.selectbox("📚 Επιλογή Προγράμματος", options=prog_options if prog_options else ["-- Κανένα Πρόγραμμα --"])
                 
-                # Επιλογή Σχολικού Έτους στο οποίο θα ανήκει το τμήμα
+                # Επιλογή Σχολικού Έτους
                 year_options = [f"{y}-{y+1}" for y in range(2026, 2030)]
                 sel_year_for_class = st.selectbox("📅 Σχολικό Έτος", options=year_options)
                 
@@ -1040,6 +1040,14 @@ else:
                         st.warning("⚠️ Συμπληρώστε το όνομα του τμήματος!")
                     else:
                         try:
+                            # --- ΑΥΤΟΜΑΤΟΣ ΥΠΟΛΟΓΙΣΜΟΣ ΗΜΕΡΟΜΗΝΙΩΝ ---
+                            # Από το "2026-2027" παίρνουμε το 2026 για την έναρξη και το 2027 για τη λήξη
+                            start_year_str = sel_year_for_class.split("-")[0]
+                            end_year_str = "20" + sel_year_for_class.split("-")[1] if len(sel_year_for_class.split("-")[1]) == 2 else str(int(start_year_str) + 1)
+                            
+                            auto_start_date = f"{start_year_str}-09-01"
+                            auto_end_date = f"{end_year_str}-07-31"
+
                             gc = get_gspread_client()
                             sh_c = gc.open(OLD_SHEET_NAME).worksheet("db_class")
                             c_rows = sh_c.get_all_values()
@@ -1049,12 +1057,18 @@ else:
                                 if ids:
                                     next_c_id = max(ids) + 1
                             
-                            # Αν το Google Sheet db_class υποστηρίζει περισσότερες στήλες (π.χ. id, class_name, program, school_year)
-                            # Αποθηκεύουμε ανάλογα με τη δομή σου (εδώ αποθηκεύονται στη σειρά ή προσαρμόζονται)
-                            sh_c.append_row([next_c_id, uppercase_clean(new_class_name), str(sel_prog_for_class), str(sel_year_for_class)])
+                            # Αποθήκευση: id, όνομα τμήματος, πρόγραμμα, σχολικό έτος, start_date, end_date
+                            sh_c.append_row([
+                                next_c_id, 
+                                uppercase_clean(new_class_name), 
+                                str(sel_prog_for_class), 
+                                str(sel_year_for_class), 
+                                auto_start_date, 
+                                auto_end_date
+                            ])
                             
-                            st.success(f"✅ Το τμήμα '{new_class_name}' για το πρόγραμμα '{sel_prog_for_class}' ({sel_year_for_class}) δημιουργήθηκε επιτυχώς!")
-                            time.sleep(1.2)
+                            st.success(f"✅ Το τμήμα '{new_class_name}' δημιουργήθηκε επιτυχώς! (Έναρξη: {auto_start_date} | Λήξη: {auto_end_date})")
+                            time.sleep(1.5)
                             st.rerun()
                         except Exception as e:
                             st.error(f"Σφάλμα αποθήκευσης τμήματος: {e}")
@@ -1066,30 +1080,6 @@ else:
                 st.dataframe(c_df, use_container_width=True, hide_index=True)
             else:
                 st.info("Δεν βρέθηκαν τμήματα.")
-
-        with tab2:
-            st.markdown("#### Δημιουργία Νέου Προγράμματος")
-            with st.form("new_prog_form", clear_on_submit=True):
-                new_prog_name = st.text_input("Όνομα Νέου Προγράμματος (π.χ. ROBOLAND)").strip()
-                if st.form_submit_button("💾 Αποθήκευση Προγράμματος"):
-                    if not new_prog_name:
-                        st.warning("⚠️ Συμπληρώστε το όνομα του προγράμματος!")
-                    else:
-                        try:
-                            gc = get_gspread_client()
-                            sh_p = gc.open(OLD_SHEET_NAME).worksheet("db_programs")
-                            p_rows = sh_p.get_all_values()
-                            next_p_id = 1
-                            if len(p_rows) > 1:
-                                ids = [int(r[0]) for r in p_rows[1:] if r and r[0].isdigit()]
-                                if ids:
-                                    next_p_id = max(ids) + 1
-                            sh_p.append_row([next_p_id, uppercase_clean(new_prog_name)])
-                            st.success(f"✅ Το πρόγραμμα '{new_prog_name}' δημιουργήθηκε επιτυχώς!")
-                            time.sleep(1.2)
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Σφάλμα αποθήκευσης προγράμματος: {e}")
             
             st.markdown("---")
             st.markdown("#### Υπάρχοντα Προγράμματα")
