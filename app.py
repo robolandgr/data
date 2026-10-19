@@ -909,18 +909,17 @@ else:
                                         if ids:
                                             nid = max(ids) + 1
                                     
-                                    # Καταχώρηση γραμμής χωρίς περιττές στήλες
+                                    # Σειρά πεδίων με το σχολικό έτος (yr) στη στήλη H (index 7)
                                     sh.append_row([
-                                        nid, 
-                                        int(c_id), 
-                                        str(row['customer_lastname']), 
-                                        str(row['customer_firstname']), 
-                                        datetime.today().strftime('%Y-%m-%d'), 
-                                        rec, 
-                                        amt, 
-                                        str(prog), 
-                                        pay_method, 
-                                        str(yr)
+                                        nid,                              # 1: id_payment
+                                        int(c_id),                        # 2: id_customer
+                                        str(row['customer_lastname']),    # 3: customer_lastname
+                                        str(row['customer_firstname']),   # 4: customer_firstname
+                                        datetime.today().strftime('%Y-%m-%d'), # 5: payment_date
+                                        rec,                              # 6: receipt_number
+                                        amt,                              # 7: amount_paid
+                                        str(yr),                          # 8 (Στήλη H): school_year
+                                        pay_method                        # 9: pay_method
                                     ])
                                     
                                     check_and_update_status_to_finish(int(c_id), yr, prog)
