@@ -1263,8 +1263,7 @@ else:
                 st.info("Δεν βρέθηκαν δεδομένα με τα επιλεγμένα φίλτρα.")
             else:
                 summary_df = summary_df.sort_values(by='Ονοματεπώνυμο', ascending=True)
-                st.dataframe(summary_df[['Ονοματεπώνυμο', 'Συμφωνηθέν (€)', 'Class', 'Έτος', 'Πληρωμένα (€5)', 'Υπόλοιπο (€)']].rename(columns={'Πληρωμένα (€5)': 'Πληρωμένα (€)'}), use_container_width=True, hide_index=True)
-
+                st.dataframe(summary_df[['Ονοματεπώνυμο', 'Συμφωνηθέν (€)', 'Class', 'Έτος', 'Πληρωμένα (€)', 'Υπόλοιπο (€)']], use_container_width=True, hide_index=True)
                 # Κουμπί εκτύπωσης συγκεντρωτικού σε PDF
                 if st.button("📥 Εκτύπωση Συγκεντρωτικού Πίνακα (PDF)"):
                     pdf_sum_buf = generate_summary_payments_pdf(summary_df, sel_sum_year, sel_sum_class)
