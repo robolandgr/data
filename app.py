@@ -231,41 +231,70 @@ def remove_accents(input_str):
     nfkd_form = unicodedata.normalize('NFKD', input_str)
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
-def generate_report_pdf_customers(report_df, selected_year="ΟΛΑ"):
+def generate_report_pdf_customers(report_df, selected_year="ΟΛΑ", selected_class="Ιδιωτικά"):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
     story = []
     styles = getSampleStyleSheet()
 
-    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=15, alignment=1, textColor=colors.HexColor('#1F2937'), fontName='Helvetica-Bold')
-    subtitle_style = ParagraphStyle('SubTitle', parent=styles['Normal'], fontSize=11, alignment=1, spaceAfter=20, textColor=colors.HexColor('#4B5563'), fontName='Helvetica-Bold')
-    label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=8.5, fontName='Helvetica-Bold', textColor=colors.HexColor('#4B5563'))
-    value_style = ParagraphStyle('Value', parent=styles['Normal'], fontSize=9.5, fontName='Helvetica-Bold', textColor=colors.HexColor('#111827'))
-    name_style = ParagraphStyle('Name', parent=styles['Normal'], fontSize=11, fontName='Helvetica-Bold', textColor=colors.HexColor('#1F2937'))
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=14, alignment=1, textColor=colors.HexColor('#1F2937'), fontName='Helvetica-Bold')
+    subtitle_style = ParagraphStyle('SubTitle', parent=styles['Normal'], fontSize=10, alignment=1, spaceAfter=15, textColor=colors.HexColor('#4B5563'), fontName='Helvetica-Bold')
+    label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=8, fontName='Helvetica-Bold', textColor=colors.HexColor('#4B5563'))
+    value_style = ParagraphStyle('Value', parent=styles['Normal'], fontSize=9, fontName='Helvetica', textColor=colors.HexColor('#111827'))
+    name_style = ParagraphStyle('Name', parent=styles['Normal'], fontSize=10.5, fontName='Helvetica-Bold', textColor=colors.HexColor('#1F2937'))
 
-    story.append(Paragraph("ΜΗΤΡΩΟ ΠΕΛΑΤΩΝ & ΕΓΓΡΑΦΩΝ", title_style))
-    story.append(Paragraph(f"ΦΙΛΤΡΑ: ΕΤΟΣ: {remove_accents(str(selected_year).upper())}", subtitle_style))
-    story.append(Spacer(1, 10))
+    story.append(Paragraph(f"ΜΗΤΡΩΟ ΠΕΛΑΤΩΝ & ΕΓΓΡΑΦΩΝ ({selected_class.upper()})", title_style))
+    story.append(Paragraph(f"ΣΧΟΛΙΚΟ ΕΤΟΣ: {remove_accents(str(selected_year).upper())}", subtitle_style))
+    story.append(Spacer(1, 5))
+
+    class_lower = str(selected_class).strip().lower()
 
     for _, row in report_df.iterrows():
         lname = remove_accents(str(row.get('customer_lastname', '')).upper())
         fname = remove_accents(str(row.get('customer_firstname', '')).upper())
         year = remove_accents(str(row.get('school_year', '')).upper())
-        prog = remove_accents(str(row.get('program', '')).upper())
-        u_class = remove_accents(str(row.get('class', '')).upper())
         status = remove_accents(str(row.get('status', '')).upper())
-
-        row_data = [
-            [Paragraph("ΜΑΘΗΤΗΣ:", label_style), Paragraph("ΣΧΟΛΙΚΟ ΕΤΟΣ:", label_style), Paragraph("ΚΑΤΑΣΤΑΣΗ:", label_style)],
-            [Paragraph(f"{lname} {fname}", name_style), Paragraph(year, value_style), Paragraph(status, value_style)],
-            [Paragraph("ΠΡΟΓΡΑΜΜΑ:", label_style), Paragraph("ΤΜΗΜΑ:", label_style), Paragraph("", label_style)],
-            [Paragraph(prog, value_style), Paragraph(u_class, value_style), Paragraph("", value_style)]
-        ]
         
-        t = Table(row_data, colWidths=[270, 135, 135])
-        t.setStyle(TableStyle([('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#E5E7EB')), ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#F3F4F6')), ('TOPPADDING', (0, 0), (-1, -1), 6), ('BOTTOMPADDING', (0, 0), (-1, -1), 6)]))
+        p_lname = remove_accents(str(row.get('parent_lastname', '')))
+        p_fname = remove_accents(str(row.get('parent_firstname', '')))
+        tele = remove_accents(str(row.get('telephone', '')))
+        mail = remove_accents(str(row.get('email', '')))
+
+        if class_lower == "ιδιωτικά":
+            start_d = remove_accents(str(row.get('start_date', '')))
+            adj_c = remove_accents(str(row.get('adjusted_cost', '0')))
+            energy_t = remove_accents(str(row.get('energy', '')))
+            xreos_v = remove_accents(str(row.get('xreos', '0')))
+
+            row_data = [
+                [Paragraph("ΜΑΘΗΤΗΣ:", label_style), Paragraph("ΓΟΝΕΑΣ:", label_style), Paragraph("ΤΗΛΕΦΩΝΟ / EMAIL:", label_style)],
+                [Paragraph(f"{lname} {fname}", name_style), Paragraph(f"{p_lname} {p_fname}", value_style), Paragraph(f"{tele} | {mail}", value_style)],
+                [Paragraph("ΣΧΟΛΙΚΟ ΕΤΟΣ / ΚΑΤΑΣΤΑΣΗ:", label_style), Paragraph("ΗΜ. ΕΝΑΡΞΗΣ:", label_style), Paragraph("ΣΥΜΦΩΝΗΘΕΝ / ΧΡΕΟΣ:", label_style)],
+                [Paragraph(f"{year} | {status}", value_style), Paragraph(start_d, value_style), Paragraph(f"Κόστος: {adj_c}€ | Χρέος: {xreos_v}€", value_style)]
+            ]
+            t = Table(row_data, colWidths=[180, 150, 210])
+
+        else: # Voucher
+            m_bar = remove_accents(str(row.get('m_bardia', '')))
+            start_d = remove_accents(str(row.get('start_date', '')))
+            stop_d = remove_accents(str(row.get('stop_date', '')))
+
+            row_data = [
+                [Paragraph("ΜΑΘΗΤΗΣ (VOUCHER):", label_style), Paragraph("ΓΟΝΕΑΣ:", label_style), Paragraph("ΤΗΛΕΦΩΝΟ / EMAIL:", label_style)],
+                [Paragraph(f"{lname} {fname}", name_style), Paragraph(f"{p_lname} {p_fname}", value_style), Paragraph(f"{tele} | {mail}", value_style)],
+                [Paragraph("ΣΧΟΛΙΚΟ ΕΤΟΣ / ΚΑΤΑΣΤΑΣΗ:", label_style), Paragraph("M BARDIA:", label_style), Paragraph("ΗΜΕΡΟΜΗΝΙΕΣ (ΕΝΑΡΞΗ - ΛΗΞΗ):", label_style)],
+                [Paragraph(f"{year} | {status}", value_style), Paragraph(m_bar, value_style), Paragraph(f"{start_d} έως {stop_d}", value_style)]
+            ]
+            t = Table(row_data, colWidths=[180, 150, 210])
+
+        t.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#E5E7EB')), 
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#F3F4F6')), 
+            ('TOPPADDING', (0, 0), (-1, -1), 5), 
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5)
+        ]))
         story.append(t)
-        story.append(Spacer(1, 10))
+        story.append(Spacer(1, 8))
 
     doc.build(story)
     buffer.seek(0)
