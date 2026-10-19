@@ -466,8 +466,8 @@ else:
                 st.session_state.page = "anafora_pelaton"
                 st.rerun()
         with col_r2:
-            if st.button("📅 Μηνιαία Αναφορά Παρουσίων", use_container_width=True):
-                st.session_state.page = "monthly_attendance_report"
+            if st.button("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή", use_container_width=True):
+                st.session_state.page = "payment_history_report"
                 st.rerun()
 
         st.markdown("---")
@@ -640,67 +640,8 @@ else:
                         file_name=f"parousiologio_{target_date_str}.pdf",
                         mime="application/pdf"
                     )
-    #----------------------------------------------------------------------------------------------
-    # --- ΣΕΛΙΔΑ: ΜΗΝΙΑΙΑ ΑΝΑΦΟΡΑ ΠΑΡΟΥΣΙΩΝ ---
-    elif st.session_state.page == "monthly_attendance_report":
-        if st.button("⬅️ Μενού", use_container_width=True):
-            st.session_state.page = "menu"; st.rerun()
-
-        st.subheader("📅 Μηνιαία Αναφορά Παρουσίων Μαθητών")
-        
-        col_m1, col_m2 = st.columns(2)
-        months_dict = {"Ιανουάριος": "01", "Φεβρουάριος": "02", "Μάρτιος": "03", "Απρίλιος": "04", "Μάιος": "05", "Ιούνιος": "06", "Ιούλιος": "07", "Αύγουστος": "08", "Σεπτέμβριος": "09", "Οκτώβριος": "10", "Νοέμβριος": "11", "Δεκέμβριος": "12"}
-        sel_month_name = col_m1.selectbox("Επιλογή Μήνα", options=list(months_dict.keys()))
-        sel_month_num = months_dict[sel_month_name]
-        sel_year_rep = col_m2.selectbox("Επιλογή Έτους", options=["2026-2027", "2027-2028", "2028-2029"])
-
-        att_df = load_specific_db("db_attendances")
-        if att_df.empty:
-            st.info("Δεν βρέθηκαν δεδομένα παρουσιών.")
-        else:
-            att_df.columns = att_df.columns.astype(str).str.strip()
-            # Φιλτράρισμα ανά έτος και μήνα (ημερομηνία μορφής YYYY-MM-DD)
-            att_df['dt'] = pd.to_datetime(att_df['date'], errors='coerce')
-            filtered_m = att_df[
-                (att_df['school_year'].astype(str).str.strip() == sel_year_rep) &
-                (att_df['status'].astype(str).str.strip().upper() == 'ΝΑΙ') &
-                (att_df['dt'].dt.strftime('%m') == sel_month_num)
-            ].copy()
-
-            if filtered_m.empty:
-                st.info(f"Δεν βρέθηκαν παρουσίες 'ΝΑΙ' για τον μήνα {sel_month_name} ({sel_year_rep}).")
-            else:
-                # Ομαδοποίηση ανά μαθητή
-                report_rows = []
-                grouped = filtered_m.groupby(['id_customer', 'student_name'])
-                for (c_id, s_name), g in grouped:
-                    g_sorted = g.sort_values(by='dt')
-                    # Ημέρες σε μορφή 10/10, 12/10 κλπ.
-                    days_list = [d.strftime('%d/%m') for d in g_sorted['dt'].dropna()]
-                    days_str = ", ".join(days_list)
-                    total_count = len(days_list)
-                    report_rows.append({
-                        'Μαθητής': str(s_name).strip().upper(),
-                        'Συνολικές Παρουσίες': total_count,
-                        'Ημέρες': days_str
-                    })
-
-                rep_df = pd.DataFrame(report_rows)
-                # Αλφαβητική ταξινόμηση Ονοματεπωνύμων
-                rep_df = rep_df.sort_values(by='Μαθητής', ascending=True).reset_index(drop=True)
-
-                st.dataframe(rep_df, use_container_width=True, hide_index=True)
-
-                st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("📥 Παραγωγή PDF Μηνιαίας Αναφοράς"):
-                    pdf_m = generate_monthly_attendances_pdf(rep_df, sel_month_name, sel_year_rep)
-                    if pdf_m:
-                        st.download_button(
-                            label="📥 Κατεβάστε το PDF Μηνιαίας Αναφοράς",
-                            data=pdf_m,
-                            file_name=f"miniaia_anafora_parousion_{sel_month_num}.pdf",
-                            mime="application/pdf"
-                        )
+#----------------------------------------------------------------------------------------------
+    
 #--------------------------------------------------------------------------------------------------
     # --- ΣΕΛΙΔΑ: ΕΙΣΑΓΩΓΗ ΣΕ ΤΜΗΜΑ ---
     elif st.session_state.page == "renew_registration":
