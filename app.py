@@ -444,9 +444,9 @@ else:
         st.subheader("Οικονομικά & Έξοδα")
         col_p1, col_p2 = st.columns(2)
         with col_p1:
-            if st.button("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή", use_container_width=True):
-                st.session_state.page = "payment_history_report"
-                st.rerun()
+            # if st.button("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή", use_container_width=True):
+            #    st.session_state.page = "payment_history_report"
+            #    st.rerun()
         with col_p2:
             if st.button("💸 Καταχώρηση Εξόδων", use_container_width=True):
                 st.session_state.page = "corp_payments"
