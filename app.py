@@ -897,10 +897,19 @@ else:
                                 try:
                                     gc = get_gspread_client()
                                     sh = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
-                                    recs = sh.get_all_records()
-                                    nid = int(pd.DataFrame(recs)['id_payment'].max()) + 1 if recs and 'id_payment' in pd.DataFrame(recs).columns else 1
                                     
-                                    # Στήλη J (index 9) περιέχει πλέον το σχολικό έτος (yr)
+                                    # Ανάγνωση ακατέργαστων δεδομένων για ασφαλή υπολογισμό του επόμενου ID
+                                    rows_data = sh.get_all_values()
+                                    nid = 1
+                                    if len(rows_data) > 1:
+                                        ids = []
+                                        for r in rows_data[1:]:
+                                            if r and r[0].isdigit():
+                                                ids.append(int(r[0]))
+                                        if ids:
+                                            nid = max(ids) + 1
+                                    
+                                    # Καταχώρηση γραμμής χωρίς περιττές στήλες
                                     sh.append_row([
                                         nid, 
                                         int(c_id), 
@@ -909,13 +918,13 @@ else:
                                         datetime.today().strftime('%Y-%m-%d'), 
                                         rec, 
                                         amt, 
-                                        str(prog),         # Προηγούμενο πεδίο ή θέση
+                                        str(prog), 
                                         pay_method, 
-                                        str(yr)            # Στήλη J: school_year
+                                        str(yr)
                                     ])
                                     
                                     check_and_update_status_to_finish(int(c_id), yr, prog)
-                                    st.success("✅ Η πληρωμή καταχωρήθηκε επιτυχώς με ενημέρωση του σχολικού έτους στη στήλη J!")
+                                    st.success("✅ Η πληρωμή καταχωρήθηκε επιτυχώς!")
                                     time.sleep(1.2)
                                     st.rerun()
                                 except Exception as e:
