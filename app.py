@@ -1009,27 +1009,94 @@ else:
                 sh.append_row([nid, inv, "Έξοδα", "", sup, "2026-2027", datetime.today().strftime('%Y-%m-%d'), datetime.today().strftime('%Y-%m-%d'), datetime.today().strftime('%Y-%m-%d'), amt, "Μετρητά"])
                 st.success("✅ Το έξοδο αποθηκεύτηκε!")
                 st.rerun()
-
+#------------------------------------------------------------------------
+    # --- ΣΕΛΙΔΑ: ΠΡΟΓΡΑΜΜΑΤΑ & ΤΜΗΜΑΤΑ ---
     elif st.session_state.page == "add_structure":
-        if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
-        st.subheader("Προγράμματα & Τμήματα")
-        p_df = load_specific_db("db_programs")
-        c_df = load_specific_db("db_class")
-        st.dataframe(p_df, use_container_width=True)
-        st.dataframe(c_df, use_container_width=True)
+        if st.button("⬅️ Μενού", use_container_width=True): 
+            st.session_state.page = "menu"
+            st.rerun() 
+            
+        st.subheader("📚 Διαχείριση Προγραμμάτων & Τμημάτων")
+        
+        # Tabs για διαχωρισμό δημιουργίας/προβολής Προγραμμάτων και Τμημάτων
+        tab1, tab2 = st.tabs(["🏫 Τμήματα (Classes)", "📚 Προγράμματα (Programs)"])
+        
+        with tab1:
+            st.markdown("#### Δημιουργία Νέου Τμήματος")
+            with st.form("new_class_form", clear_on_submit=True):
+                new_class_name = st.text_input("Όνομα Νέου Τμήματος (π.χ. Ιδιωτικά, Voucher)").strip()
+                if st.form_submit_button("💾 Αποθήκευση Τμήματος"):
+                    if not new_class_name:
+                        st.warning("⚠️ Συμπληρώστε το όνομα του τμήματος!")
+                    else:
+                        try:
+                            gc = get_gspread_client()
+                            sh_c = gc.open(OLD_SHEET_NAME).worksheet("db_class")
+                            c_rows = sh_c.get_all_values()
+                            next_c_id = 1
+                            if len(c_rows) > 1:
+                                ids = [int(r[0]) for r in c_rows[1:] if r and r[0].isdigit()]
+                                if ids:
+                                    next_c_id = max(ids) + 1
+                            sh_c.append_row([next_c_id, uppercase_clean(new_class_name)])
+                            st.success(f"✅ Το τμήμα '{new_class_name}' δημιουργήθηκε επιτυχώς!")
+                            time.sleep(1.2)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Σφάλμα αποθήκευσης τμήματος: {e}")
+            
+            st.markdown("---")
+            st.markdown("#### Υπάρχοντα Τμήματα")
+            c_df = load_specific_db("db_class")
+            if not c_df.empty:
+                st.dataframe(c_df, use_container_width=True, hide_index=True)
+            else:
+                st.info("Δεν βρέθηκαν τμήματα.")
 
+        with tab2:
+            st.markdown("#### Δημιουργία Νέου Προγράμματος")
+            with st.form("new_prog_form", clear_on_submit=True):
+                new_prog_name = st.text_input("Όνομα Νέου Προγράμματος (π.χ. ROBOLAND)").strip()
+                if st.form_submit_button("💾 Αποθήκευση Προγράμματος"):
+                    if not new_prog_name:
+                        st.warning("⚠️ Συμπληρώστε το όνομα του προγράμματος!")
+                    else:
+                        try:
+                            gc = get_gspread_client()
+                            sh_p = gc.open(OLD_SHEET_NAME).worksheet("db_programs")
+                            p_rows = sh_p.get_all_values()
+                            next_p_id = 1
+                            if len(p_rows) > 1:
+                                ids = [int(r[0]) for r in p_rows[1:] if r and r[0].isdigit()]
+                                if ids:
+                                    next_p_id = max(ids) + 1
+                            sh_p.append_row([next_p_id, uppercase_clean(new_prog_name)])
+                            st.success(f"✅ Το πρόγραμμα '{new_prog_name}' δημιουργήθηκε επιτυχώς!")
+                            time.sleep(1.2)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Σφάλμα αποθήκευσης προγράμματος: {e}")
+            
+            st.markdown("---")
+            st.markdown("#### Υπάρχοντα Προγράμματα")
+            p_df = load_specific_db("db_programs")
+            if not p_df.empty:
+                st.dataframe(p_df, use_container_width=True, hide_index=True)
+            else:
+                st.info("Δεν βρέθηκαν προγράμματα.")
+#------------------------------------------------------------------------
     elif st.session_state.page == "anafora_pelaton":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
         st.subheader("Μητρώο Πελατών")
         reg = load_specific_db("db_registrations")
         if not reg.empty: st.dataframe(reg, use_container_width=True)
-
+#------------------------------------------------------------------------
     elif st.session_state.page == "unassigned_customers":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun()
         st.subheader("Ανένταχτοι Πελάτοι")
         cust = load_specific_db("db_customers")
         if not cust.empty: st.dataframe(cust, use_container_width=True)
-
+#------------------------------------------------------------------------
     elif st.session_state.page == "complaints_page":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
         st.subheader("Παράπονα & Σχόλια")
