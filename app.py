@@ -237,13 +237,14 @@ def generate_report_pdf_customers(report_df, selected_year="ΟΛΑ", selected_cl
     story = []
     styles = getSampleStyleSheet()
 
-    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=14, alignment=1, textColor=colors.HexColor('#1F2937'), fontName='Helvetica-Bold')
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=13, alignment=1, textColor=colors.HexColor('#1F2937'), fontName='Helvetica-Bold')
     subtitle_style = ParagraphStyle('SubTitle', parent=styles['Normal'], fontSize=10, alignment=1, spaceAfter=15, textColor=colors.HexColor('#4B5563'), fontName='Helvetica-Bold')
-    label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=8, fontName='Helvetica-Bold', textColor=colors.HexColor('#4B5563'))
-    value_style = ParagraphStyle('Value', parent=styles['Normal'], fontSize=9, fontName='Helvetica', textColor=colors.HexColor('#111827'))
-    name_style = ParagraphStyle('Name', parent=styles['Normal'], fontSize=10.5, fontName='Helvetica-Bold', textColor=colors.HexColor('#1F2937'))
+    label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=7.5, fontName='Helvetica-Bold', textColor=colors.HexColor('#4B5563'))
+    value_style = ParagraphStyle('Value', parent=styles['Normal'], fontSize=8.5, fontName='Helvetica', textColor=colors.HexColor('#111827'))
+    name_style = ParagraphStyle('Name', parent=styles['Normal'], fontSize=9.5, fontName='Helvetica-Bold', textColor=colors.HexColor('#1F2937'))
 
-    story.append(Paragraph(f"ΜΗΤΡΩΟ ΠΕΛΑΤΩΝ & ΕΓΓΡΑΦΩΝ ({selected_class.upper()})", title_style))
+    # Τίτλος χωρίς Ιδιωτικά / Voucher
+    story.append(Paragraph("ΜΗΤΡΩΟ ΜΑΘΗΤΩΝ", title_style))
     story.append(Paragraph(f"ΣΧΟΛΙΚΟ ΕΤΟΣ: {remove_accents(str(selected_year).upper())}", subtitle_style))
     story.append(Spacer(1, 5))
 
@@ -252,16 +253,14 @@ def generate_report_pdf_customers(report_df, selected_year="ΟΛΑ", selected_cl
     for _, row in report_df.iterrows():
         lname = remove_accents(str(row.get('customer_lastname', '')).upper())
         fname = remove_accents(str(row.get('customer_firstname', '')).upper())
-        year = remove_accents(str(row.get('school_year', '')).upper())
-        status = remove_accents(str(row.get('status', '')).upper())
         
         p_lname = remove_accents(str(row.get('parent_lastname', '')))
         p_fname = remove_accents(str(row.get('parent_firstname', '')))
         tele = remove_accents(str(row.get('telephone', '')))
         mail = remove_accents(str(row.get('email', '')))
+        status = remove_accents(str(row.get('status', '')))
 
         if class_lower == "ιδιωτικά":
-            start_d = remove_accents(str(row.get('start_date', '')))
             adj_c = remove_accents(str(row.get('adjusted_cost', '0')))
             energy_t = remove_accents(str(row.get('energy', '')))
             xreos_v = remove_accents(str(row.get('xreos', '0')))
@@ -269,37 +268,35 @@ def generate_report_pdf_customers(report_df, selected_year="ΟΛΑ", selected_cl
             row_data = [
                 [Paragraph("ΜΑΘΗΤΗΣ:", label_style), Paragraph("ΓΟΝΕΑΣ:", label_style), Paragraph("ΤΗΛΕΦΩΝΟ / EMAIL:", label_style)],
                 [Paragraph(f"{lname} {fname}", name_style), Paragraph(f"{p_lname} {p_fname}", value_style), Paragraph(f"{tele} | {mail}", value_style)],
-                [Paragraph("ΣΧΟΛΙΚΟ ΕΤΟΣ / ΚΑΤΑΣΤΑΣΗ:", label_style), Paragraph("ΗΜ. ΕΝΑΡΞΗΣ:", label_style), Paragraph("ΣΥΜΦΩΝΗΘΕΝ / ΧΡΕΟΣ:", label_style)],
-                [Paragraph(f"{year} | {status}", value_style), Paragraph(start_d, value_style), Paragraph(f"Κόστος: {adj_c}€ | Χρέος: {xreos_v}€", value_style)]
+                [Paragraph("ΚΑΤΑΣΤΑΣΗ:", label_style), Paragraph("ΤΥΠΟΣ ΧΡΕΩΣΗΣ:", label_style), Paragraph("ΣΥΜΦΩΝΗΘΕΝ / ΧΡΕΟΣ:", label_style)],
+                [Paragraph(status, value_style), Paragraph(energy_t, value_style), Paragraph(f"Κόστος: {adj_c}€ | Χρέος: {xreos_v}€", value_style)]
             ]
             t = Table(row_data, colWidths=[180, 150, 210])
 
         else: # Voucher
             m_bar = remove_accents(str(row.get('m_bardia', '')))
-            start_d = remove_accents(str(row.get('start_date', '')))
             stop_d = remove_accents(str(row.get('stop_date', '')))
 
             row_data = [
                 [Paragraph("ΜΑΘΗΤΗΣ (VOUCHER):", label_style), Paragraph("ΓΟΝΕΑΣ:", label_style), Paragraph("ΤΗΛΕΦΩΝΟ / EMAIL:", label_style)],
                 [Paragraph(f"{lname} {fname}", name_style), Paragraph(f"{p_lname} {p_fname}", value_style), Paragraph(f"{tele} | {mail}", value_style)],
-                [Paragraph("ΣΧΟΛΙΚΟ ΕΤΟΣ / ΚΑΤΑΣΤΑΣΗ:", label_style), Paragraph("M BARDIA:", label_style), Paragraph("ΗΜΕΡΟΜΗΝΙΕΣ (ΕΝΑΡΞΗ - ΛΗΞΗ):", label_style)],
-                [Paragraph(f"{year} | {status}", value_style), Paragraph(m_bar, value_style), Paragraph(f"{start_d} έως {stop_d}", value_style)]
+                [Paragraph("ΚΑΤΑΣΤΑΣΗ:", label_style), Paragraph("ΒΑΡΔΙΑ (M BARDIA):", label_style), Paragraph("ΗΜ. ΛΗΞΗΣ (STOP DATE):", label_style)],
+                [Paragraph(status, value_style), Paragraph(m_bar, value_style), Paragraph(stop_d, value_style)]
             ]
             t = Table(row_data, colWidths=[180, 150, 210])
 
         t.setStyle(TableStyle([
             ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#E5E7EB')), 
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#F3F4F6')), 
-            ('TOPPADDING', (0, 0), (-1, -1), 5), 
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5)
+            ('TOPPADDING', (0, 0), (-1, -1), 4), 
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4)
         ]))
         story.append(t)
-        story.append(Spacer(1, 8))
+        story.append(Spacer(1, 6))
 
     doc.build(story)
     buffer.seek(0)
     return buffer
-
 def generate_summary_payments_pdf(summary_df, school_year_filter, class_filter):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
@@ -1500,11 +1497,10 @@ else:
         if not reg_df.empty:
             reg_df.columns = reg_df.columns.astype(str).str.strip()
             
-            # Ενσωμάτωση στοιχείων γονέα και επικοινωνίας από το db_customers εφόσον υπάρχει
+            # Ενσωμάτωση στοιχείων γονέα και επικοινωνίας από το db_customers
             if not cust_df.empty:
                 cust_df.columns = cust_df.columns.astype(str).str.strip()
                 if 'id_customer' in reg_df.columns and 'id_customer' in cust_df.columns:
-                    # Καθαρισμός τύπων δεδομένων για σωστό merge
                     reg_df['id_customer_str'] = reg_df['id_customer'].astype(str).str.strip()
                     cust_df['id_customer_str'] = cust_df['id_customer'].astype(str).str.strip()
                     
@@ -1544,48 +1540,44 @@ else:
             if filtered_reg.empty:
                 st.info("Δεν βρέθηκαν εγγραφές με τα επιλεγμένα φίλτρα.")
             else:
-                # --- ΔΙΑΧΩΡΙΣΜΟΣ GRID ΑΝΑΛΟΓΑ ΜΕ ΤΟ CLASS ---
                 class_lower = sel_class_filter.strip().lower()
                 
+                # --- ΑΥΣΤΗΡΗ ΕΠΙΛΟΓΗ ΣΤΗΛΩΝ ΑΝΑΛΟΓΑ ΜΕ ΤΟ CLASS ---
                 if class_lower == "ιδιωτικά":
-                    # Εξαίρεση: program, stop_date, id_registration, id_customer_str
-                    cols_to_drop = ['program', 'stop_date', 'id_registration', 'id_customer_str', 'Program', 'Stop Date', 'Id Registration']
-                    existing_drop = [c for c in cols_to_drop if c in filtered_reg.columns]
-                    grid_df = filtered_reg.drop(columns=existing_drop).copy()
-                    
+                    desired_cols = [
+                        'customer_firstname', 'customer_lastname', 
+                        'parent_firstname', 'parent_lastname', 
+                        'telephone', 'email', 
+                        'adjusted_cost', 'energy', 'xreos'
+                    ]
                 elif class_lower == "voucher":
-                    # Εξαίρεση: id_registration, program, adjusted_cost, energy, xreos, id_customer_str (Κρατάμε M Bardia και στοιχεία γονέα)
-                    cols_to_drop = ['id_registration', 'program', 'adjusted_cost', 'energy', 'xreos', 'id_customer_str', 'Id Registration', 'Program', 'Adjusted Cost', 'Energy', 'Xreos']
-                    existing_drop = [c for c in cols_to_drop if c in filtered_reg.columns]
-                    grid_df = filtered_reg.drop(columns=existing_drop).copy()
+                    desired_cols = [
+                        'customer_firstname', 'customer_lastname', 
+                        'parent_firstname', 'parent_lastname', 
+                        'telephone', 'email', 
+                        'status', 'stop_date', 'm_bardia'
+                    ]
                 else:
-                    grid_df = filtered_reg.copy()
-                    if 'program' in grid_df.columns:
-                        grid_df = grid_df.drop(columns=['program'])
-                    if 'id_customer_str' in grid_df.columns:
-                        grid_df = grid_df.drop(columns=['id_customer_str'])
+                    desired_cols = filtered_reg.columns.tolist()
+
+                # Κρατάμε μόνο όσες από τις επιθυμητές στήλες υπάρχουν στο DataFrame
+                existing_cols = [c for c in desired_cols if c in filtered_reg.columns]
+                grid_df = filtered_reg[existing_cols].copy()
 
                 # --- ΜΕΤΑΦΡΑΣΗ ΤΙΤΛΩΝ ΣΤΑ ΕΛΛΗΝΙΚΑ ---
                 renames = {
-                    'id_registration': 'ID Εγγραφής',
-                    'id_customer': 'ID Πελάτη',
                     'customer_lastname': 'Επώνυμο Μαθητή',
                     'customer_firstname': 'Όνομα Μαθητή',
-                    'school_year': 'Σχολικό Έτος',
-                    'program': 'Πρόγραμμα',
-                    'class': 'Τμήμα',
-                    'status': 'Κατάσταση',
-                    'start_date': 'Ημ. Έναρξης',
-                    'stop_date': 'Ημ. Λήξης',
-                    'adjusted_cost': 'Συμφωνηθέν Ποσό',
-                    'energy': 'Τύπος Χρέωσης',
-                    'xreos': 'Υπόλοιπο (Χρέος)',
-                    'm_bardia': 'M Bardia',
-                    'M Bardia': 'M Bardia',
                     'parent_firstname': 'Όνομα Γονέα',
                     'parent_lastname': 'Επώνυμο Γονέα',
                     'telephone': 'Τηλέφωνο',
-                    'email': 'Email'
+                    'email': 'Email',
+                    'status': 'Κατάσταση',
+                    'stop_date': 'Ημ. Λήξης',
+                    'm_bardia': 'Βάρδια (M Bardia)',
+                    'adjusted_cost': 'Συμφωνηθέν Ποσό',
+                    'energy': 'Τύπος Χρέωσης',
+                    'xreos': 'Υπόλοιπο (Χρέος)'
                 }
                 
                 grid_df = grid_df.rename(columns=renames)
@@ -1593,9 +1585,9 @@ else:
                 
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("📥 Παραγωγή PDF Μητρώου"):
-                    rep_pdf = generate_report_pdf_customers(filtered_reg, selected_year=sel_year_filter)
+                    rep_pdf = generate_report_pdf_customers(filtered_reg, selected_year=sel_year_filter, selected_class=sel_class_filter)
                     if rep_pdf:
-                        st.download_button("📥 Κατεβάστε το αρχείο PDF", data=rep_pdf, file_name="mitroo_pelaton.pdf", mime="application/pdf")
+                        st.download_button("📥 Κατεβάστε το αρχείο PDF", data=rep_pdf, file_name=f"mitroo_mathiton_{class_lower}.pdf", mime="application/pdf")
         else:
             st.info("Δεν βρέθηκαν εγγραφές στη βάση `db_registrations`.")
 #------------------------------------------------------------------------
