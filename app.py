@@ -1010,81 +1010,29 @@ else:
                 st.success("✅ Το έξοδο αποθηκεύτηκε!")
                 st.rerun()
 #------------------------------------------------------------------------
-    # --- ΣΕΛΙΔΑ: ΠΡΟΓΡΑΜΜΑΤΑ & ΤΜΗΜΑΤΑ ---
-    elif st.session_state.page == "add_structure":
-        if st.button("⬅️ Μενού", use_container_width=True): 
-            st.session_state.page = "menu"
-            st.rerun() 
-            
-        st.subheader("📚 Διαχείριση Τμημάτων")
-        
-        progs_df = load_specific_db("db_programs")
-        prog_options = progs_df['program_name'].tolist() if not progs_df.empty else []
-        c_df = load_specific_db("db_class")
-        
-        # Επιλογή λειτουργίας: Δημιουργία ή Επεξεργασία
-        struct_mode = st.radio("Ενέργεια Τμημάτων", ["Δημιουργία Νέου Τμήματος", "Επεξεργασία Υπάρχοντος Τμήματος"])
-        
-        if struct_mode == "Δημιουργία Νέου Τμήματος":
-            st.markdown("#### Δημιουργία Νέου Τμήματος")
-            with st.form("new_class_form", clear_on_submit=True):
-                new_class_name = st.text_input("Όνομα Νέου Τμήματος (π.χ. Τμήμα Α, Group 1)").strip()
-                sel_prog_for_class = st.selectbox("📚 Επιλογή Προγράμματος", options=prog_options if prog_options else ["-- Κανένα Πρόγραμμα --"])
-                
-                year_options = [f"{y}-{y+1}" for y in range(2026, 2030)]
-                sel_year_for_class = st.selectbox("📅 Σχολικό Έτος", options=year_options)
-                
-                if st.form_submit_button("💾 Αποθήκευση Τμήματος"):
-                    if not new_class_name:
-                        st.warning("⚠️ Συμπληρώστε το όνομα του τμήματος!")
-                    else:
-                        try:
-                            start_year_str = sel_year_for_class.split("-")[0]
-                            end_year_str = "20" + sel_year_for_class.split("-")[1] if len(sel_year_for_class.split("-")[1]) == 2 else str(int(start_year_str) + 1)
-                            
-                            auto_start_date = f"{start_year_str}-09-01"
-                            auto_end_date = f"{end_year_str}-07-31"
-
-                            gc = get_gspread_client()
-                            sh_c = gc.open(OLD_SHEET_NAME).worksheet("db_class")
-                            c_rows = sh_c.get_all_values()
-                            next_c_id = 1
-                            if len(c_rows) > 1:
-                                ids = [int(r[0]) for r in c_rows[1:] if r and r[0].isdigit()]
-                                if ids:
-                                    next_c_id = max(ids) + 1
-                            
-                            sh_c.append_row([
-                                next_c_id, 
-                                uppercase_clean(new_class_name), 
-                                str(sel_prog_for_class), 
-                                str(sel_year_for_class), 
-                                auto_start_date, 
-                                auto_end_date
-                            ])
-                            
-                            st.success(f"✅ Το τμήμα '{new_class_name}' δημιουργήθηκε επιτυχώς!")
-                            time.sleep(1.2)
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Σφάλμα αποθήκευσης τμήματος: {e}")
-        
-        else:
+    else:
             st.markdown("#### Επεξεργασία Υπάρχοντος Τμήματος")
             if c_df.empty:
                 st.info("Δεν υπάρχουν διαθέσιμα τμήματα προς επεξεργασία.")
             else:
                 c_df.columns = c_df.columns.astype(str).str.strip()
-                # Δημιουργία πεδίου εμφάνισης για το selectbox
-                c_df['display_class'] = "ID: " + c_df.iloc[:, 0].astype(str) + " | Τμήμα: " + c_df.get('class_name', c_df.iloc[:, 1]).astype(str) + " | Έτος: " + c_df.get('school_year', '').astype(str)
+                
+                # Δυναμικός εντοπισμός στηλών για αποφυγή σφαλμάτων
+                col_id = c_df.columns[0]
+                col_name = 'class_name' if 'class_name' in c_df.columns else c_df.columns[1]
+                col_prog = 'program' if 'program' in c_df.columns else (c_df.columns[2] if len(c_df.columns) > 2 else c_df.columns[1])
+                col_year = 'school_year' if 'school_year' in c_df.columns else (c_df.columns[3] if len(c_df.columns) > 3 else c_df.columns[0])
+
+                # Δημιουργία πεδίου εμφάνισης με ασφαλή ανάγνωση
+                c_df['display_class'] = "ID: " + c_df[col_id].astype(str) + " | Τμήμα: " + c_df[col_name].astype(str) + " | Έτος: " + c_df[col_year].astype(str)
                 
                 sel_class_str = st.selectbox("Επιλογή Τμήματος προς Επεξεργασία", options=c_df['display_class'].tolist())
                 class_to_edit = c_df[c_df['display_class'] == sel_class_str].iloc[0]
                 
-                target_class_id = str(class_to_edit.iloc[0]).strip()
-                cur_name = str(class_to_edit.get('class_name', class_to_edit.iloc[1])).strip()
-                cur_prog = str(class_to_edit.get('program', class_to_edit.iloc[2] if len(class_to_edit) > 2 else '')).strip()
-                cur_year = str(class_to_edit.get('school_year', class_to_edit.iloc[3] if len(class_to_edit) > 3 else '2026-2027')).strip()
+                target_class_id = str(class_to_edit[col_id]).strip()
+                cur_name = str(class_to_edit[col_name]).strip()
+                cur_prog = str(class_to_edit[col_prog]).strip()
+                cur_year = str(class_to_edit[col_year]).strip()
                 
                 prog_idx = prog_options.index(cur_prog) if cur_prog in prog_options else 0
                 year_options = [f"{y}-{y+1}" for y in range(2026, 2030)]
@@ -1122,21 +1070,6 @@ else:
                             st.rerun()
                         except Exception as e:
                             st.error(f"Σφάλμα ενημέρωσης τμήματος: {e}")
-
-        st.markdown("---")
-        st.markdown("#### Υπάρχοντα Τμήματα")
-        c_df_refreshed = load_specific_db("db_class")
-        if not c_df_refreshed.empty:
-            st.dataframe(c_df_refreshed, use_container_width=True, hide_index=True)
-        else:
-            st.info("Δεν βρέθηκαν τμήματα.")
-
-        st.markdown("---")
-        st.markdown("#### Υπάρχοντα Προγράμματα")
-        if not progs_df.empty:
-            st.dataframe(progs_df, use_container_width=True, hide_index=True)
-        else:
-            st.info("Δεν βρέθηκαν προγράμματα.")
 #------------------------------------------------------------------------
     elif st.session_state.page == "anafora_pelaton":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
