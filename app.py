@@ -444,9 +444,9 @@ else:
         st.subheader("Οικονομικά & Έξοδα")
         col_p1, col_p2 = st.columns(2)
         with col_p1:
-            # if st.button("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή", use_container_width=True):
-            #    st.session_state.page = "payment_history_report"
-            #    st.rerun()
+            if st.button("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή", use_container_width=True):
+                st.session_state.page = "payment_history_report"
+                st.rerun()
         with col_p2:
             if st.button("💸 Καταχώρηση Εξόδων", use_container_width=True):
                 st.session_state.page = "corp_payments"
@@ -460,15 +460,9 @@ else:
 
         st.markdown("---")
         st.subheader("Αναφορές")
-        col_r1, col_r2 = st.columns(2)
-        with col_r1:
-            if st.button("📋 Μητρώο Πελατών", use_container_width=True):
-                st.session_state.page = "anafora_pelaton"
-                st.rerun()
-        with col_r2:
-            if st.button("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή", use_container_width=True):
-                st.session_state.page = "payment_history_report"
-                st.rerun()
+        if st.button("📋 Μητρώο Πελατών", use_container_width=True):
+            st.session_state.page = "anafora_pelaton"
+            st.rerun()
 
         st.markdown("---")
         st.markdown("##### 🔗 Διαχείριση Παραπόνων & Σχολίων")
