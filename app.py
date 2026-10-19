@@ -280,7 +280,7 @@ def generate_report_pdf_customers(report_df, selected_year="ΟΛΑ", selected_cl
             row_data = [
                 [Paragraph("ΜΑΘΗΤΗΣ (VOUCHER):", label_style), Paragraph("ΓΟΝΕΑΣ:", label_style), Paragraph("ΤΗΛΕΦΩΝΟ / EMAIL:", label_style)],
                 [Paragraph(f"{lname} {fname}", name_style), Paragraph(f"{p_lname} {p_fname}", value_style), Paragraph(f"{tele} | {mail}", value_style)],
-                [Paragraph("ΚΑΤΑΣΤΑΣΗ:", label_style), Paragraph("ΒΑΡΔΙΑ (M BARDIA):", label_style), Paragraph("ΗΜ. ΛΗΞΗΣ (STOP DATE):", label_style)],
+                [Paragraph("ΚΑΤΑΣΤΑΣΗ:", label_style), Paragraph("ΒΑΡΔΙΑ:", label_style), Paragraph("ΗΜ. ΛΗΞΗΣ:", label_style)],
                 [Paragraph(status, value_style), Paragraph(m_bar, value_style), Paragraph(stop_d, value_style)]
             ]
             t = Table(row_data, colWidths=[180, 150, 210])
