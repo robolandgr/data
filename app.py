@@ -1018,13 +1018,23 @@ else:
             
         st.subheader("📚 Διαχείριση Προγραμμάτων & Τμημάτων")
         
-        # Tabs για διαχωρισμό δημιουργίας/προβολής Προγραμμάτων και Τμημάτων
         tab1, tab2 = st.tabs(["🏫 Τμήματα (Classes)", "📚 Προγράμματα (Programs)"])
         
         with tab1:
             st.markdown("#### Δημιουργία Νέου Τμήματος")
+            progs_df = load_specific_db("db_programs")
+            prog_options = progs_df['program_name'].tolist() if not progs_df.empty else []
+            
             with st.form("new_class_form", clear_on_submit=True):
-                new_class_name = st.text_input("Όνομα Νέου Τμήματος (π.χ. Ιδιωτικά, Voucher)").strip()
+                new_class_name = st.text_input("Όνομα Νέου Τμήματος (π.χ. Τμήμα Α, Group 1)").strip()
+                
+                # Επιλογή Προγράμματος στο οποίο θα ανήκει το τμήμα
+                sel_prog_for_class = st.selectbox("📚 Επιλογή Προγράμματος", options=prog_options if prog_options else ["-- Κανένα Πρόγραμμα --"])
+                
+                # Επιλογή Σχολικού Έτους στο οποίο θα ανήκει το τμήμα
+                year_options = [f"{y}-{y+1}" for y in range(2026, 2030)]
+                sel_year_for_class = st.selectbox("📅 Σχολικό Έτος", options=year_options)
+                
                 if st.form_submit_button("💾 Αποθήκευση Τμήματος"):
                     if not new_class_name:
                         st.warning("⚠️ Συμπληρώστε το όνομα του τμήματος!")
@@ -1038,8 +1048,12 @@ else:
                                 ids = [int(r[0]) for r in c_rows[1:] if r and r[0].isdigit()]
                                 if ids:
                                     next_c_id = max(ids) + 1
-                            sh_c.append_row([next_c_id, uppercase_clean(new_class_name)])
-                            st.success(f"✅ Το τμήμα '{new_class_name}' δημιουργήθηκε επιτυχώς!")
+                            
+                            # Αν το Google Sheet db_class υποστηρίζει περισσότερες στήλες (π.χ. id, class_name, program, school_year)
+                            # Αποθηκεύουμε ανάλογα με τη δομή σου (εδώ αποθηκεύονται στη σειρά ή προσαρμόζονται)
+                            sh_c.append_row([next_c_id, uppercase_clean(new_class_name), str(sel_prog_for_class), str(sel_year_for_class)])
+                            
+                            st.success(f"✅ Το τμήμα '{new_class_name}' για το πρόγραμμα '{sel_prog_for_class}' ({sel_year_for_class}) δημιουργήθηκε επιτυχώς!")
                             time.sleep(1.2)
                             st.rerun()
                         except Exception as e:
