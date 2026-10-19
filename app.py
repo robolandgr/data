@@ -143,7 +143,7 @@ def update_customer_xreos(c_id, school_year, program):
             mask_pay = (
                 (df_pay['id_customer'].astype(str).str.strip() == str(c_id)) & 
                 (df_pay['school_year'].astype(str).str.strip() == str(school_year))
-            ]
+            ])
             total_paid = pd.to_numeric(df_pay.loc[mask_pay, 'amount_paid'], errors='coerce').fillna(0).sum()
 
         # 5. Τρέχον Χρέος = (Συνολικά ΝΑΙ * adjusted_cost) - Συνολικές Πληρωμές
