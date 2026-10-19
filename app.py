@@ -594,20 +594,19 @@ else:
         with st.form("reg_form", clear_on_submit=True):
             c1, c2 = st.columns(2)
             with c1:
-                cf = st.text_input("Όνομα Παιδιού / Πελάτη").strip()
-                cl = st.text_input("Επώνυμο Παιδιού / Πελάτη").strip()
+                cf = st.text_input("Όνομα").strip()
+                cl = st.text_input("Επώνυμο").strip()
                 pf = st.text_input("Όνομα Πατρός").strip()
                 pl = st.text_input("Επώνυμο Πατρός").strip()
                 tel = st.text_input("Τηλέφωνο").strip()
                 em = st.text_input("Email").strip()
-                adr = st.text_input("Διεύθυνση").strip()
             with c2:
+                adr = st.text_input("Διεύθυνση").strip()
                 bd = st.date_input("Ημερομηνία Γέννησης", value=datetime(2015,1,1))
                 tax_user = st.text_input("Taxis User").strip()
                 tax_pass = st.text_input("Taxis Pass").strip()
                 adt = st.text_input("ADT").strip()
                 afm = st.text_input("AFM").strip()
-                cost_input = st.number_input("Κόστος Μαθητή (€)", min_value=0.0, value=5.0)
 
             if st.form_submit_button("💾 Αποθήκευση"):
                 if not cf or not cl:
@@ -622,7 +621,7 @@ else:
                         today_str = datetime.today().strftime('%Y-%m-%d')
                         bd_str = bd.strftime('%Y-%m-%d') if bd else today_str
 
-                        # Σειρά πεδίων: id_customer, customer_firstname, customer_lastname, parent_firstname, parent_lastname, telephone, email, address, birthday_date, register_date, Taxis_User, Taxis_Pass, ADT, AFM, [κόστος]
+                        # Σειρά πεδίων ακριβώς όπως τη ζήτησες
                         row_data = [
                             next_id, 
                             uppercase_clean(cf), 
@@ -637,8 +636,7 @@ else:
                             tax_user, 
                             tax_pass, 
                             adt, 
-                            afm,
-                            cost_input
+                            afm
                         ]
                         sh.append_row(row_data)
                         st.success("✅ Επιτυχής καταχώρηση πελάτη!")
@@ -646,7 +644,7 @@ else:
                         st.rerun()
                     except Exception as e:
                         st.error(f"Σφάλμα αποθήκευσης: {e}")
-#---------------------------------------------------------------------------------------------------------
+
     # --- ΣΕΛΙΔΑ: ΕΠΕΞΕΡΓΑΣΙΑ ΣΤΟΙΧΕΙΩΝ ΠΕΛΑΤΗ ---
     elif st.session_state.page == "customer_registry":
         if st.button("⬅️ Μενού", use_container_width=True): 
@@ -675,18 +673,12 @@ else:
                         p_ln = st.text_input("Επώνυμο Πατρός", value=str(row.get('parent_lastname', '')))
                         tel = st.text_input("Τηλέφωνο", value=str(row.get('telephone', '')))
                         em = st.text_input("Email", value=str(row.get('email', '')))
-                        adr = st.text_input("Διεύθυνση", value=str(row.get('address', '')))
                     with c2:
+                        adr = st.text_input("Διεύθυνση", value=str(row.get('address', '')))
                         tax_u = st.text_input("Taxis User", value=str(row.get('Taxis_User', '')))
                         tax_p = st.text_input("Taxis Pass", value=str(row.get('Taxis_Pass', '')))
                         adt_val = st.text_input("ADT", value=str(row.get('ADT', row.get('Passport', ''))))
                         afm_val = st.text_input("AFM", value=str(row.get('AFM', '')))
-                        
-                        cur_cost = 5.0
-                        if len(row) >= 15:
-                            try: cur_cost = float(str(row.iloc[14]).replace(',', '.') or 5.0)
-                            except: cur_cost = 5.0
-                        cost_v = st.number_input("Κόστος Μαθητή (€)", value=cur_cost, min_value=0.0)
 
                     if st.form_submit_button("💾 Αποθήκευση Αλλαγών"):
                         try:
@@ -706,7 +698,6 @@ else:
                                 sh_cust.update_cell(r_idx, 12, tax_p.strip())
                                 sh_cust.update_cell(r_idx, 13, adt_val.strip())
                                 sh_cust.update_cell(r_idx, 14, afm_val.strip())
-                                sh_cust.update_cell(r_idx, 15, cost_v)
                                 
                                 st.success("✅ Τα στοιχεία του πελάτη ενημερώθηκαν επιτυχώς!")
                                 time.sleep(1.2)
