@@ -1466,21 +1466,44 @@ else:
         
         st.subheader("📋 Μητρώο Πελατών & Εγγραφών")
         reg_df = load_specific_db("db_registrations")
+        cust_df = load_specific_db("db_customers")
         
         if not reg_df.empty:
             reg_df.columns = reg_df.columns.astype(str).str.strip()
             
+            # Ενσωμάτωση στοιχείων γονέα και επικοινωνίας από το db_customers εφόσον υπάρχει
+            if not cust_df.empty:
+                cust_df.columns = cust_df.columns.astype(str).str.strip()
+                if 'id_customer' in reg_df.columns and 'id_customer' in cust_df.columns:
+                    # Καθαρισμός τύπων δεδομένων για σωστό merge
+                    reg_df['id_customer_str'] = reg_df['id_customer'].astype(str).str.strip()
+                    cust_df['id_customer_str'] = cust_df['id_customer'].astype(str).str.strip()
+                    
+                    cols_to_use = ['id_customer_str', 'parent_firstname', 'parent_lastname', 'telephone', 'email']
+                    existing_cust_cols = [c for c in cols_to_use if c in cust_df.columns]
+                    
+                    merged_df = pd.merge(
+                        reg_df, 
+                        cust_df[existing_cust_cols], 
+                        on='id_customer_str', 
+                        how='left'
+                    )
+                else:
+                    merged_df = reg_df.copy()
+            else:
+                merged_df = reg_df.copy()
+
             # Δημιουργία φίλτρων ανά Σχολικό Έτος και Τμήμα
             col_f1, col_f2 = st.columns(2)
-            available_years = ["ΟΛΑ"] + sorted(reg_df['school_year'].dropna().astype(str).unique().tolist(), reverse=True)
+            available_years = ["ΟΛΑ"] + sorted(merged_df['school_year'].dropna().astype(str).unique().tolist(), reverse=True)
             sel_year_filter = col_f1.selectbox("📅 Φίλτρο ανά Σχολικό Έτος", options=available_years, key="anafora_year_filter")
             
-            available_classes = sorted(reg_df['class'].dropna().astype(str).unique().tolist())
+            available_classes = sorted(merged_df['class'].dropna().astype(str).unique().tolist())
             if not available_classes:
                 available_classes = ["Ιδιωτικά", "Voucher"]
             sel_class_filter = col_f2.selectbox("🏫 Επιλογή Τμήματος (Class)", options=available_classes, key="anafora_class_filter")
             
-            filtered_reg = reg_df.copy()
+            filtered_reg = merged_df.copy()
             if sel_year_filter != "ΟΛΑ":
                 filtered_reg = filtered_reg[filtered_reg['school_year'].astype(str).str.strip() == sel_year_filter]
             
@@ -1496,27 +1519,29 @@ else:
                 class_lower = sel_class_filter.strip().lower()
                 
                 if class_lower == "ιδιωτικά":
-                    # Εξαίρεση: program, stop_date, id_registration
-                    cols_to_drop = ['program', 'stop_date', 'id_registration', 'Program', 'Stop Date', 'Id Registration']
+                    # Εξαίρεση: program, stop_date, id_registration, id_customer_str
+                    cols_to_drop = ['program', 'stop_date', 'id_registration', 'id_customer_str', 'Program', 'Stop Date', 'Id Registration']
                     existing_drop = [c for c in cols_to_drop if c in filtered_reg.columns]
                     grid_df = filtered_reg.drop(columns=existing_drop).copy()
                     
                 elif class_lower == "voucher":
-                    # Εξαίρεση: id_registration, program, adjusted_cost, energy, xreos
-                    cols_to_drop = ['id_registration', 'program', 'adjusted_cost', 'energy', 'xreos', 'Id Registration', 'Program', 'Adjusted Cost', 'Energy', 'Xreos']
+                    # Εξαίρεση: id_registration, program, adjusted_cost, energy, xreos, id_customer_str (Κρατάμε M Bardia και στοιχεία γονέα)
+                    cols_to_drop = ['id_registration', 'program', 'adjusted_cost', 'energy', 'xreos', 'id_customer_str', 'Id Registration', 'Program', 'Adjusted Cost', 'Energy', 'Xreos']
                     existing_drop = [c for c in cols_to_drop if c in filtered_reg.columns]
                     grid_df = filtered_reg.drop(columns=existing_drop).copy()
                 else:
                     grid_df = filtered_reg.copy()
                     if 'program' in grid_df.columns:
                         grid_df = grid_df.drop(columns=['program'])
+                    if 'id_customer_str' in grid_df.columns:
+                        grid_df = grid_df.drop(columns=['id_customer_str'])
 
                 # --- ΜΕΤΑΦΡΑΣΗ ΤΙΤΛΩΝ ΣΤΑ ΕΛΛΗΝΙΚΑ ---
                 renames = {
                     'id_registration': 'ID Εγγραφής',
                     'id_customer': 'ID Πελάτη',
-                    'customer_lastname': 'Επώνυμο',
-                    'customer_firstname': 'Όνομα',
+                    'customer_lastname': 'Επώνυμο Μαθητή',
+                    'customer_firstname': 'Όνομα Μαθητή',
                     'school_year': 'Σχολικό Έτος',
                     'program': 'Πρόγραμμα',
                     'class': 'Τμήμα',
@@ -1525,7 +1550,13 @@ else:
                     'stop_date': 'Ημ. Λήξης',
                     'adjusted_cost': 'Συμφωνηθέν Ποσό',
                     'energy': 'Τύπος Χρέωσης',
-                    'xreos': 'Υπόλοιπο (Χρέος)'
+                    'xreos': 'Υπόλοιπο (Χρέος)',
+                    'm_bardia': 'M Bardia',
+                    'M Bardia': 'M Bardia',
+                    'parent_firstname': 'Όνομα Γονέα',
+                    'parent_lastname': 'Επώνυμο Γονέα',
+                    'telephone': 'Τηλέφωνο',
+                    'email': 'Email'
                 }
                 
                 grid_df = grid_df.rename(columns=renames)
