@@ -1236,7 +1236,12 @@ else:
                     ]
                     paid_sum = pd.to_numeric(p_match.get('amount_paid', 0), errors='coerce').fillna(0).sum()
 
-                xreos_val = adj_cost - paid_sum
+                # Αντλούμε το πραγματικό υπόλοιπο (xreos) απευθείας από τη βάση εγγραφών
+                xreos_raw = reg.iloc[11] if len(reg) > 11 else reg.get('xreos', 0)
+                try:
+                    xreos_val = float(str(xreos_raw).replace(',', '.') or 0.0)
+                except:
+                    xreos_val = max(0.0, adj_cost - paid_sum)
 
                 summary_rows.append({
                     'id_customer': c_id,
@@ -1245,7 +1250,7 @@ else:
                     'Class': u_class,
                     'Έτος': s_year,
                     'Πληρωμένα (€)': paid_sum,
-                    'Υπόλοιπο (€)': max(0.0, xreos_val)
+                    'Υπόλοιπο (€)': xreos_val
                 })
 
             summary_df = pd.DataFrame(summary_rows)
