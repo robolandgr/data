@@ -185,36 +185,6 @@ def generate_single_attendance_pdf(attendance_rows, date_str, school_year):
     buffer.seek(0)
     return buffer
 
-def check_and_update_status_to_finish(c_id, school_year, program):
-    try:
-        gc = get_gspread_client()
-        sh = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
-        raw_data = sh.get_all_records()
-        df = pd.DataFrame(raw_data)
-        df.columns = df.columns.astype(str).str.strip()
-        mask = (df['id_customer'].astype(str) == str(c_id)) & (df['school_year'].astype(str) == str(school_year)) & (df['program'].astype(str) == str(program))
-        target_indices = df[mask].index.tolist()
-        if not target_indices: return
-
-        for idx in target_indices:
-            row_idx = idx + 2 
-            current_status = str(df.loc[idx, 'status']).strip().upper()
-            adj_val = df.loc[idx, 'adjusted_cost']
-            total_cost = float(str(adj_val).replace(',', '.')) if pd.notna(adj_val) and str(adj_val).strip() != '' else 0.0
-            
-            pays_sh = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
-            pays_df = pd.DataFrame(pays_sh.get_all_records())
-            pays_df.columns = pays_df.columns.astype(str).str.strip()
-            mask_pay = (pays_df['id_customer'].astype(str) == str(c_id)) & (pays_df['school_year'].astype(str) == str(school_year)) & (pays_df['program'].astype(str) == str(program))
-            paid = pd.to_numeric(pays_df.loc[mask_pay, 'amount_paid'], errors='coerce').sum()
-            balance = total_cost - paid
-
-            if current_status != "FINISH":
-                if balance <= 0 and total_cost > 0:
-                    sh.update_cell(row_idx, 8, "FINISH")
-    except Exception as e:
-        pass
-
 # --- PDF ΣΥΝΑΡΤΗΣΕΙΣ ---
 def generate_customer_payment_history_pdf(customer_name, selected_year, payments_df):
     buffer = io.BytesIO()
@@ -1165,8 +1135,6 @@ else:
                                             str(yr),                          # 8 (Στήλη H): school_year
                                             pay_method                        # 9: pay_method
                                         ])
-                                        
-                                        check_and_update_status_to_finish(int(c_id), yr, prog)
                                         
                                         # Ενημέρωση χρέους (xreos) μετά τη νέα πληρωμή
                                         update_customer_xreos(c_id, yr, prog)
