@@ -584,63 +584,142 @@ else:
                         st.error(f"Σφάλμα: {e}")
 
     # --- ΥΠΟΛΟΙΠΕΣ ΣΕΛΙΔΕΣ ---
+    # --- ΣΕΛΙΔΑ: ΝΕΑ ΕΓΓΡΑΦΗ ΠΕΛΑΤΗ ---
     elif st.session_state.page == "register":
-        if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
+        if st.button("⬅️ Μενού", use_container_width=True): 
+            st.session_state.page = "menu"
+            st.rerun() 
+            
         st.subheader("Νέα Εγγραφή Πελάτη")
-        cat = st.radio("Κατηγορία", ["Μαθητής", "Ενήλικας"])
         with st.form("reg_form", clear_on_submit=True):
-            cf = st.text_input("Όνομα").strip()
-            cl = st.text_input("Επώνυμο").strip()
-            tel = st.text_input("Τηλέφωνο").strip()
-            # Στήλη K (index 10) για το κόστος μαθητή
-            cost_input = st.number_input("Κόστος Μαθητή (€) [Στήλη K]", min_value=0.0, value=5.0)
-            if st.form_submit_button("💾 Αποθήκευση"):
-                if cf and cl:
-                    gc = get_gspread_client()
-                    sh = gc.open(OLD_SHEET_NAME).worksheet("db_customers")
-                    recs = sh.get_all_records()
-                    next_id = int(pd.DataFrame(recs)['id_customer'].max()) + 1 if recs and 'id_customer' in pd.DataFrame(recs).columns else 1
-                    # Δημιουργία γραμμής ώστε η στήλη K να παίρνει το cost_input
-                    row_data = [next_id, uppercase_clean(cf), uppercase_clean(cl), "", "", tel, "", "", datetime.today().strftime('%Y-%m-%d'), datetime.today().strftime('%Y-%m-%d'), cat, "", "", "", "", "", "", "", "", "", cost_input]
-                    sh.append_row(row_data)
-                    st.success("✅ Αποθηκεύτηκε!")
-                    st.rerun()
+            c1, c2 = st.columns(2)
+            with c1:
+                cf = st.text_input("Όνομα Παιδιού / Πελάτη").strip()
+                cl = st.text_input("Επώνυμο Παιδιού / Πελάτη").strip()
+                pf = st.text_input("Όνομα Πατρός").strip()
+                pl = st.text_input("Επώνυμο Πατρός").strip()
+                tel = st.text_input("Τηλέφωνο").strip()
+                em = st.text_input("Email").strip()
+                adr = st.text_input("Διεύθυνση").strip()
+            with c2:
+                bd = st.date_input("Ημερομηνία Γέννησης", value=datetime(2015,1,1))
+                tax_user = st.text_input("Taxis User").strip()
+                tax_pass = st.text_input("Taxis Pass").strip()
+                adt = st.text_input("ADT").strip()
+                afm = st.text_input("AFM").strip()
+                cost_input = st.number_input("Κόστος Μαθητή (€)", min_value=0.0, value=5.0)
 
-    elif st.session_state.page == "customer_registry":
-        if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
-        st.subheader("Επεξεργασία Στοιχείων Πελάτη")
-        cust_df = load_specific_db("db_customers")
-        if not cust_df.empty:
-            cust_df['display'] = cust_df['customer_lastname'].astype(str) + " " + cust_df['customer_firstname'].astype(str)
-            sel = st.selectbox("Επιλογή", options=["-- Επιλέξτε --"] + cust_df['display'].tolist())
-            if sel != "-- Επιλέξτε --":
-                row = cust_df[cust_df['display'] == sel].iloc[0]
-                with st.form("edit"):
-                    fn = st.text_input("Όνομα", value=row['customer_firstname'])
-                    ln = st.text_input("Επώνυμο", value=row['customer_lastname'])
-                    # Επεξεργασία κόστους στήλης K αν υπάρχει
-                    cur_k = 5.0
-                    if len(row) >= 11:
-                        try: cur_k = float(str(row.iloc[10]).replace(',', '.') or 5.0)
-                        except: cur_k = 5.0
-                    new_cost_k = st.number_input("Κόστος Μαθητή (€) [Στήλη K]", value=cur_k, min_value=0.0)
-                    if st.form_submit_button("💾 Αποθήκευση"):
+            if st.form_submit_button("💾 Αποθήκευση"):
+                if not cf or not cl:
+                    st.error("⚠️ Το Όνομα και το Επώνυμο είναι υποχρεωτικά!")
+                else:
+                    try:
                         gc = get_gspread_client()
                         sh = gc.open(OLD_SHEET_NAME).worksheet("db_customers")
-                        cell = sh.find(str(row['id_customer']))
-                        if cell:
-                            sh.update_cell(cell.row, 2, uppercase_clean(fn))
-                            sh.update_cell(cell.row, 3, uppercase_clean(ln))
-                            sh.update_cell(cell.row, 11, new_cost_k) # Στήλη K
-                            st.success("✅ Ενημερώθηκε!")
-                            st.rerun()
+                        recs = sh.get_all_records()
+                        next_id = int(pd.DataFrame(recs)['id_customer'].max()) + 1 if recs and 'id_customer' in pd.DataFrame(recs).columns else 1
 
+                        today_str = datetime.today().strftime('%Y-%m-%d')
+                        bd_str = bd.strftime('%Y-%m-%d') if bd else today_str
+
+                        # Σειρά πεδίων: id_customer, customer_firstname, customer_lastname, parent_firstname, parent_lastname, telephone, email, address, birthday_date, register_date, Taxis_User, Taxis_Pass, ADT, AFM, [κόστος]
+                        row_data = [
+                            next_id, 
+                            uppercase_clean(cf), 
+                            uppercase_clean(cl), 
+                            uppercase_clean(pf), 
+                            uppercase_clean(pl), 
+                            tel, 
+                            em.lower(), 
+                            uppercase_clean(adr), 
+                            bd_str, 
+                            today_str, 
+                            tax_user, 
+                            tax_pass, 
+                            adt, 
+                            afm,
+                            cost_input
+                        ]
+                        sh.append_row(row_data)
+                        st.success("✅ Επιτυχής καταχώρηση πελάτη!")
+                        time.sleep(1.2)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Σφάλμα αποθήκευσης: {e}")
+#---------------------------------------------------------------------------------------------------------
+    # --- ΣΕΛΙΔΑ: ΕΠΕΞΕΡΓΑΣΙΑ ΣΤΟΙΧΕΙΩΝ ΠΕΛΑΤΗ ---
+    elif st.session_state.page == "customer_registry":
+        if st.button("⬅️ Μενού", use_container_width=True): 
+            st.session_state.page = "menu"
+            st.rerun() 
+
+        st.subheader("Επεξεργασία Στοιχείων Πελάτη")
+        cust_df = load_specific_db("db_customers")
+        
+        if cust_df.empty:
+            st.warning("⚠️ Η βάση πελατών είναι κενή.")
+        else:
+            cust_df['display'] = cust_df['customer_lastname'].astype(str) + " " + cust_df['customer_firstname'].astype(str) + " (ID: " + cust_df['id_customer'].astype(str) + ")"
+            sel = st.selectbox("🔍 Επιλογή Πελάτη", options=["-- Επιλέξτε --"] + cust_df['display'].tolist())
+
+            if sel != "-- Επιλέξτε --":
+                row = cust_df[cust_df['display'] == sel].iloc[0]
+                c_id_str = str(row['id_customer']).strip()
+
+                with st.form("edit_customer_form"):
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        fn = st.text_input("Όνομα", value=str(row.get('customer_firstname', '')))
+                        ln = st.text_input("Επώνυμο", value=str(row.get('customer_lastname', '')))
+                        p_fn = st.text_input("Όνομα Πατρός", value=str(row.get('parent_firstname', '')))
+                        p_ln = st.text_input("Επώνυμο Πατρός", value=str(row.get('parent_lastname', '')))
+                        tel = st.text_input("Τηλέφωνο", value=str(row.get('telephone', '')))
+                        em = st.text_input("Email", value=str(row.get('email', '')))
+                        adr = st.text_input("Διεύθυνση", value=str(row.get('address', '')))
+                    with c2:
+                        tax_u = st.text_input("Taxis User", value=str(row.get('Taxis_User', '')))
+                        tax_p = st.text_input("Taxis Pass", value=str(row.get('Taxis_Pass', '')))
+                        adt_val = st.text_input("ADT", value=str(row.get('ADT', row.get('Passport', ''))))
+                        afm_val = st.text_input("AFM", value=str(row.get('AFM', '')))
+                        
+                        cur_cost = 5.0
+                        if len(row) >= 15:
+                            try: cur_cost = float(str(row.iloc[14]).replace(',', '.') or 5.0)
+                            except: cur_cost = 5.0
+                        cost_v = st.number_input("Κόστος Μαθητή (€)", value=cur_cost, min_value=0.0)
+
+                    if st.form_submit_button("💾 Αποθήκευση Αλλαγών"):
+                        try:
+                            gc = get_gspread_client()
+                            sh_cust = gc.open(OLD_SHEET_NAME).worksheet("db_customers")
+                            cell = sh_cust.find(c_id_str)
+                            if cell:
+                                r_idx = cell.row
+                                sh_cust.update_cell(r_idx, 2, uppercase_clean(fn))
+                                sh_cust.update_cell(r_idx, 3, uppercase_clean(ln))
+                                sh_cust.update_cell(r_idx, 4, uppercase_clean(p_fn))
+                                sh_cust.update_cell(r_idx, 5, uppercase_clean(p_ln))
+                                sh_cust.update_cell(r_idx, 6, tel.strip())
+                                sh_cust.update_cell(r_idx, 7, em.strip().lower())
+                                sh_cust.update_cell(r_idx, 8, uppercase_clean(adr))
+                                sh_cust.update_cell(r_idx, 11, tax_u.strip())
+                                sh_cust.update_cell(r_idx, 12, tax_p.strip())
+                                sh_cust.update_cell(r_idx, 13, adt_val.strip())
+                                sh_cust.update_cell(r_idx, 14, afm_val.strip())
+                                sh_cust.update_cell(r_idx, 15, cost_v)
+                                
+                                st.success("✅ Τα στοιχεία του πελάτη ενημερώθηκαν επιτυχώς!")
+                                time.sleep(1.2)
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"Σφάλμα ενημέρωσης: {e}")
+#---------------------------------------------------------------------------------------------------------
     elif st.session_state.page == "view_customers":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun()
         st.subheader("Διαχείριση STOP")
         reg_df = load_specific_db("db_registrations")
         if not reg_df.empty: st.dataframe(reg_df, use_container_width=True, hide_index=True)
-
+#---------------------------------------------------------------------------------------------------------
     elif st.session_state.page == "add_payment":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
         st.subheader("Καταχώρηση Πληρωμής Συνδρομής")
