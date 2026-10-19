@@ -301,6 +301,39 @@ def generate_report_pdf_customers(report_df, selected_year="ΟΛΑ"):
     buffer.seek(0)
     return buffer
 
+def generate_summary_payments_pdf(summary_df, school_year_filter, class_filter):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    story = []
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=12, alignment=1, fontName='Helvetica-Bold', textColor=colors.HexColor('#111827'), spaceAfter=10)
+    sub_style = ParagraphStyle('Sub', parent=styles['Normal'], fontSize=10, alignment=1, fontName='Helvetica-Bold', textColor=colors.HexColor('#4B5563'), spaceAfter=15)
+    th_style = ParagraphStyle('TH', parent=styles['Normal'], fontSize=8.5, fontName='Helvetica-Bold', textColor=colors.white)
+    td_style = ParagraphStyle('TD', parent=styles['Normal'], fontSize=8.5, fontName='Helvetica', textColor=colors.HexColor('#111827'))
+
+    story.append(Paragraph("ΣΥΓΚΕΝΤΡΩΤΙΚΗ ΑΝΑΦΟΡΑ ΟΙΚΟΝΟΜΙΚΩΝ ΜΑΘΗΤΩΝ", title_style))
+    story.append(Paragraph(f"ΦΙΛΤΡΑ -> ΕΤΟΣ: {school_year_filter} | ΤΜΗΜΑ: {class_filter}", sub_style))
+    story.append(Spacer(1, 5))
+
+    table_data = [[Paragraph("ΟΝΟΜΑΤΕΠΩΝΥΜΟ", th_style), Paragraph("ΣΥΜΦΩΝΗΘΕΝ (€)", th_style), Paragraph("CLASS", th_style), Paragraph("ΠΛΗΡΩΜΕΝΑ (€)", th_style), Paragraph("ΥΠΟΛΟΙΠΟ (€)", th_style)]]
+    
+    for _, row in summary_df.iterrows():
+        table_data.append([
+            Paragraph(remove_accents(str(row.get('Ονοματεπώνυμο', ''))), td_style),
+            Paragraph(f"{row.get('Συμφωνηθέν (€)', 0):.2f}", td_style),
+            Paragraph(remove_accents(str(row.get('Class', ''))), td_style),
+            Paragraph(f"{row.get('Πληρωμένα (€)', 0):.2f}", td_style),
+            Paragraph(f"{row.get('Υπόλοιπο (€)', 0):.2f}", td_style)
+        ])
+
+    t = Table(table_data, colWidths=[150, 90, 80, 100, 80], repeatRows=1)
+    t.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1F2937')), ('ALIGN', (0,0), (-1,-1), 'LEFT'), ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#D1D5DB'))]))
+    story.append(t)
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
 def generate_monthly_attendances_pdf(report_df, month_str, year_str):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
@@ -1156,31 +1189,92 @@ else:
         cust_df = load_specific_db("db_customers")
         regs_df = load_specific_db("db_registrations")
 
-        # --- ΓΕΝΙΚΟΣ ΠΙΝΑΚΑΣ (GRID) ΜΕ ΟΛΕΣ ΤΙΣ ΠΛΗΡΩΜΕΣ ΟΛΩΝ ΤΩΝ ΠΕΛΑΤΩΝ ---
-        st.markdown("### 📋 Συγκεντρωτικός Πίνακας Όλων των Πληρωμών")
-        if pays_df.empty:
-            st.info("Δεν υπάρχουν καθόλου καταχωρημένες πληρωμές στη βάση.")
+        # --- ΕΝΕΡΓΑ ΦΙΛΤΡΑ ΓΙΑ ΤΟ ΣΥΓΚΕΝΤΡΩΤΙΚΟ GRID ---
+        st.markdown("### 📋 Συγκεντρωτικός Πίνακας Οικονομικών Μαθητών")
+        
+        col_s1, col_s2 = st.columns(2)
+        all_years_opt = ["ΟΛΑ"] + (sorted(regs_df['school_year'].dropna().astype(str).unique().tolist(), reverse=True) if not regs_df.empty else ["2026-2027"])
+        sel_sum_year = col_s1.selectbox("📅 Φίλτρο Έτους (Συγκεντρωτικού)", options=all_years_opt, key="sum_year_filter")
+
+        all_classes_opt = ["ΟΛΑ"] + (sorted(regs_df['class'].dropna().astype(str).unique().tolist()) if not regs_df.empty else ["Ιδιωτικά", "Voucher"])
+        sel_sum_class = col_s2.selectbox("🏫 Φίλτρο Τμήματος / Class (Συγκεντρωτικού)", options=all_classes_opt, key="sum_class_filter")
+
+        if regs_df.empty or cust_df.empty:
+            st.info("Δεν βρέθηκαν δεδομένα εγγραφών ή πελατών.")
         else:
-            pays_df.columns = pays_df.columns.astype(str).str.strip()
-            
-            # Δημιουργία συγκεντρωτικού DataFrame για όλες τις πληρωμές
-            all_payments_display = pd.DataFrame({
-                'ID Πληρωμής': pays_df.get('id_payment', ''),
-                'ID Πελάτη': pays_df.get('id_customer', ''),
-                'Επώνυμο': pays_df.get('customer_lastname', ''),
-                'Όνομα': pays_df.get('customer_firstname', ''),
-                'Ημερομηνία': pays_df.get('payment_date', ''),
-                'Αρ. Απόδειξης': pays_df.get('receipt_number', ''),
-                'Σχολικό Έτος': pays_df.get('school_year', ''),
-                'Τρόπος': pays_df.get('pay_method', ''),
-                'Ποσό (€)': pd.to_numeric(pays_df.get('amount_paid', 0), errors='coerce').fillna(0)
-            })
-            
-            st.dataframe(all_payments_display, use_container_width=True, hide_index=True)
-            
-            # Υπολογισμός και εμφάνιση συνολικού ποσού όλων των πληρωμών
-            grand_total = all_payments_display['Ποσό (€)'].sum()
-            st.markdown(f"**📉 Συνολικό Ποσό Όλων των Πληρωμών:** `{grand_total:.2f} €`")
+            regs_df.columns = regs_df.columns.astype(str).str.strip()
+            cust_df.columns = cust_df.columns.astype(str).str.strip()
+
+            # Φιλτράρισμα εγγραφών βάσει επιλογών
+            filtered_regs = regs_df.copy()
+            if sel_sum_year != "ΟΛΑ":
+                filtered_regs = filtered_regs[filtered_regs['school_year'].astype(str).str.strip() == sel_sum_year]
+            if sel_sum_class != "ΟΛΑ":
+                filtered_regs = filtered_regs[filtered_regs['class'].astype(str).str.strip().str.lower() == sel_sum_class.strip().lower()]
+
+            # Δημιουργία συγκεντρωτικού πίνακα ανά μαθητή/εγγραφή
+            summary_rows = []
+            for _, reg in filtered_regs.iterrows():
+                c_id = str(reg.get('id_customer', '')).strip()
+                s_year = str(reg.get('school_year', '')).strip()
+                u_class = str(reg.get('class', '')).strip()
+                
+                # Στοιχεία πελάτη
+                c_match = cust_df[cust_df['id_customer'].astype(str).str.strip() == c_id]
+                if not c_match.empty:
+                    c_row = c_match.iloc[0]
+                    full_name = f"{c_row.get('customer_lastname', '')} {c_row.get('customer_firstname', '')}"
+                else:
+                    full_name = f"Άγνωστος (ID: {c_id})"
+
+                # Συμφωνηθέν ποσό (adjusted_cost)
+                adj_cost = 0.0
+                try:
+                    adj_str = str(reg.get('adjusted_cost', 0)).replace(',', '.')
+                    adj_cost = float(adj_str) if adj_str.strip() != '' else 0.0
+                except:
+                    adj_cost = 0.0
+
+                # Πληρωμένα ποσά για τη συγκεκριμένη εγγραφή/έτος
+                paid_sum = 0.0
+                if not pays_df.empty:
+                    pays_df.columns = pays_df.columns.astype(str).str.strip()
+                    p_match = pays_df[
+                        (pays_df['id_customer'].astype(str).str.strip() == c_id) & 
+                        (pays_df['school_year'].astype(str).str.strip() == s_year)
+                    ]
+                    paid_sum = pd.to_numeric(p_match.get('amount_paid', 0), errors='coerce').fillna(0).sum()
+
+                # Υπόλοιπο (Χρέος / xreos ή Υπολογιζόμενο)
+                xreos_val = adj_cost - paid_sum
+
+                summary_rows.append({
+                    'id_customer': c_id,
+                    'Ονοματεπώνυμο': full_name,
+                    'Συμφωνηθέν (€)': adj_cost,
+                    'Class': u_class,
+                    'Έτος': s_year,
+                    'Πληρωμένα (€)': paid_sum,
+                    'Υπόλοιπο (€)': max(0.0, xreos_val)
+                })
+
+            summary_df = pd.DataFrame(summary_rows)
+            if summary_df.empty:
+                st.info("Δεν βρέθηκαν δεδομένα με τα επιλεγμένα φίλτρα.")
+            else:
+                summary_df = summary_df.sort_values(by='Ονοματεπώνυμο', ascending=True)
+                st.dataframe(summary_df[['Ονοματεπώνυμο', 'Συμφωνηθέν (€)', 'Class', 'Έτος', 'Πληρωμένα (€5)', 'Υπόλοιπο (€)']].rename(columns={'Πληρωμένα (€5)': 'Πληρωμένα (€)'}), use_container_width=True, hide_index=True)
+
+                # Κουμπί εκτύπωσης συγκεντρωτικού σε PDF
+                if st.button("📥 Εκτύπωση Συγκεντρωτικού Πίνακα (PDF)"):
+                    pdf_sum_buf = generate_summary_payments_pdf(summary_df, sel_sum_year, sel_sum_class)
+                    if pdf_sum_buf:
+                        st.download_button(
+                            label="📥 Κατεβάστε το Συγκεντρωτικό PDF",
+                            data=pdf_sum_buf,
+                            file_name="sygentrotikos_oikonomikos_pinakas.pdf",
+                            mime="application/pdf"
+                        )
 
         st.markdown("---")
         st.markdown("### 🔍 Αναλυτικό Ιστορικό & Φίλτρα ανά Μαθητή")
@@ -1192,7 +1286,7 @@ else:
                 cust_df = cust_df.sort_values(by=['customer_lastname', 'customer_firstname'], ascending=[True, True])
 
             cust_df['display'] = cust_df['customer_lastname'].astype(str) + " " + cust_df['customer_firstname'].astype(str) + " (ID: " + cust_df['id_customer'].astype(str) + ")"
-            sel_cust = st.selectbox("🔍 Επιλογή Μαθητή / Πελάτη", options=["-- Επιλέξτε --"] + cust_df['display'].tolist())
+            sel_cust = st.selectbox("🔍 Επιλογή Μαθητή για Ιστορικό", options=["-- Επιλέξτε --"] + cust_df['display'].tolist())
 
             if sel_cust != "-- Επιλέξτε --":
                 row_c = cust_df[cust_df['display'] == sel_cust].iloc[0]
@@ -1201,33 +1295,36 @@ else:
 
                 user_regs = pd.DataFrame()
                 if not regs_df.empty:
-                    regs_df.columns = regs_df.columns.astype(str).str.strip()
                     user_regs = regs_df[regs_df['id_customer'].astype(str).str.strip() == c_id]
 
+                # --- 2α ΦΙΛΤΡΑ (ΕΤΟΣ ΚΑΙ CLASS ΓΙΑ ΤΟΝ ΣΥΓΚΕΚΡΙΜΕΝΟ ΜΑΘΗΤΗ) ---
+                st.markdown(f"#### ⚙️ Φίλτρα Ιστορικού για: **{cust_full_name}**")
                 col_f1, col_f2 = st.columns(2)
                 
-                available_years = ["ΟΛΑ"] + (sorted(user_regs['school_year'].dropna().astype(str).unique().tolist(), reverse=True) if not user_regs.empty else ["2026-2027", "2027-2028"])
-                sel_year_rep = col_f1.selectbox("📅 Φίλτρο Σχολικού Έτους", options=available_years)
+                ind_years = ["ΟΛΑ"] + (sorted(user_regs['school_year'].dropna().astype(str).unique().tolist(), reverse=True) if not user_regs.empty else ["2026-2027"])
+                sel_ind_year = col_f1.selectbox("📅 Έτος Μαθητή", options=ind_years, key="ind_year")
 
-                available_classes = ["ΟΛΑ"] + (sorted(user_regs['class'].dropna().astype(str).unique().tolist()) if not user_regs.empty else ["Ιδιωτικά", "Voucher"])
-                sel_class_rep = col_f2.selectbox("🏫 Φίλτρο Τμήματος (Class)", options=available_classes)
+                ind_classes = ["ΟΛΑ"] + (sorted(user_regs['class'].dropna().astype(str).unique().tolist()) if not user_regs.empty else ["Ιδιωτικά", "Voucher"])
+                sel_ind_class = col_f2.selectbox("🏫 Class Μαθητή", options=ind_classes, key="ind_class")
 
-                if not pays_df.empty:
+                if pays_df.empty:
+                    st.info("Δεν υπάρχουν καταχωρημένες πληρωμές στη βάση.")
+                else:
                     cust_pays = pays_df[pays_df['id_customer'].astype(str).str.strip() == c_id].copy()
 
                     if cust_pays.empty:
                         st.info(f"Ο μαθητής {cust_full_name} δεν έχει καμία καταχωρημένη πληρωμή.")
                     else:
-                        if sel_year_rep != "ΟΛΑ":
+                        if sel_ind_year != "ΟΛΑ":
                             if 'school_year' in cust_pays.columns:
-                                cust_pays = cust_pays[cust_pays['school_year'].astype(str).str.strip() == sel_year_rep]
+                                cust_pays = cust_pays[cust_pays['school_year'].astype(str).str.strip() == sel_ind_year]
 
-                        if sel_class_rep != "ΟΛΑ" and not user_regs.empty:
-                            valid_years_for_class = user_regs[user_regs['class'].astype(str).str.strip().str.lower() == sel_class_rep.strip().lower()]['school_year'].astype(str).str.strip().tolist()
+                        if sel_ind_class != "ΟΛΑ" and not user_regs.empty:
+                            valid_years_for_class = user_regs[user_regs['class'].astype(str).str.strip().str.lower() == sel_ind_class.strip().lower()]['school_year'].astype(str).str.strip().tolist()
                             cust_pays = cust_pays[cust_pays['school_year'].astype(str).str.strip().isin(valid_years_for_class)]
 
                         if cust_pays.empty:
-                            st.info("Δεν βρέθηκαν πληρωμές με τα επιλεγμένα φίλτρα.")
+                            st.info("Δεν βρέθηκαν πληρωμές με τα επιλεγμένα φίλτρα μαθητή.")
                         else:
                             display_pays = pd.DataFrame({
                                 'Ημερομηνία': cust_pays.get('payment_date', ''),
@@ -1237,18 +1334,18 @@ else:
                                 'Ποσό (€)': pd.to_numeric(cust_pays.get('amount_paid', 0), errors='coerce').fillna(0)
                             })
 
-                            st.markdown(f"#### 📄 Ατομικό Ιστορικό για: **{cust_full_name}**")
+                            st.markdown(f"#### 📄 Ατομικό Ιστορικό Πληρωμών")
                             st.dataframe(display_pays, use_container_width=True, hide_index=True)
 
                             total_paid = display_pays['Ποσό (€)'].sum()
                             st.success(f"💰 **Συνολικό Πσό Πληρωμών Μαθητή:** {total_paid:.2f} €")
 
                             st.markdown("<br>", unsafe_allow_html=True)
-                            if st.button("📥 Παραγωγή PDF Ιστορικού Πληρωμών"):
-                                pdf_buffer = generate_customer_payment_history_pdf(cust_full_name, sel_year_rep, display_pays)
+                            if st.button("📥 Παραγωγή PDF Ατομικού Ιστορικού"):
+                                pdf_buffer = generate_customer_payment_history_pdf(cust_full_name, sel_ind_year, display_pays)
                                 if pdf_buffer:
                                     st.download_button(
-                                        label="📥 Κατεβάστε το PDF Ιστορικού",
+                                        label="📥 Κατεβάστε το PDF Ατομικού Ιστορικού",
                                         data=pdf_buffer,
                                         file_name=f"istoriko_pliromon_{c_id}.pdf",
                                         mime="application/pdf"
