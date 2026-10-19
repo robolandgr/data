@@ -1245,11 +1245,43 @@ else:
         else:
             st.info("Δεν βρέθηκαν προγράμματα.")
 #------------------------------------------------------------------------
+   # --- ΣΕΛΙΔΑ: ΜΗΤΡΩΟ ΠΕΛΑΤΩΝ ---
     elif st.session_state.page == "anafora_pelaton":
-        if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
-        st.subheader("Μητρώο Πελατών")
-        reg = load_specific_db("db_registrations")
-        if not reg.empty: st.dataframe(reg, use_container_width=True)
+        if st.button("⬅️ Μενού", use_container_width=True): 
+            st.session_state.page = "menu"
+            st.rerun() 
+        
+        st.subheader("📋 Μητρώο Πελατών & Εγγραφών")
+        reg_df = load_specific_db("db_registrations")
+        
+        if not reg_df.empty:
+            reg_df.columns = reg_df.columns.astype(str).str.strip()
+            
+            # Δημιουργία φίλτρων ανά Σχολικό Έτος και Τμήμα
+            col_f1, col_f2 = st.columns(2)
+            available_years = ["ΟΛΑ"] + sorted(reg_df['school_year'].dropna().astype(str).unique().tolist(), reverse=True)
+            sel_year_filter = col_f1.selectbox("📅 Φίλτρο ανά Σχολικό Έτος", options=available_years, key="anafora_year_filter")
+            
+            available_classes = ["ΟΛΑ"] + sorted(reg_df['class'].dropna().astype(str).unique().tolist())
+            sel_class_filter = col_f2.selectbox("🏫 Φίλτρο ανά Τμήμα (Class)", options=available_classes, key="anafora_class_filter")
+            
+            filtered_reg = reg_df.copy()
+            if sel_year_filter != "ΟΛΑ":
+                filtered_reg = filtered_reg[filtered_reg['school_year'].astype(str).str.strip() == sel_year_filter]
+            if sel_class_filter != "ΟΛΑ":
+                filtered_reg = filtered_reg[filtered_reg['class'].astype(str).str.strip().str.lower() == sel_class_filter.strip().lower()]
+
+            st.markdown(f"**Βρέθηκαν εγγραφές:** {len(filtered_reg)}")
+            st.dataframe(filtered_reg, use_container_width=True, hide_index=True)
+            
+            if not filtered_reg.empty:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("📥 Παραγωγή PDF Μητρώου"):
+                    rep_pdf = generate_report_pdf_customers(filtered_reg, selected_year=sel_year_filter)
+                    if rep_pdf:
+                        st.download_button("📥 Κατεβάστε το αρχείο PDF", data=rep_pdf, file_name="mitroo_pelaton.pdf", mime="application/pdf")
+        else:
+            st.info("Δεν βρέθηκαν εγγραφές στη βάση `db_registrations`.")
 #------------------------------------------------------------------------
     elif st.session_state.page == "unassigned_customers":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun()
