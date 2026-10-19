@@ -155,6 +155,36 @@ def update_customer_xreos(c_id, school_year, program):
     except Exception as e:
         pass
 
+def generate_single_attendance_pdf(attendance_rows, date_str, school_year):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    story = []
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=13, alignment=1, fontName='Helvetica-Bold', textColor=colors.HexColor('#111827'), spaceAfter=8)
+    sub_style = ParagraphStyle('Sub', parent=styles['Normal'], fontSize=10, alignment=1, fontName='Helvetica-Bold', textColor=colors.HexColor('#4B5563'), spaceAfter=15)
+    th_style = ParagraphStyle('TH', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', textColor=colors.white)
+    td_style = ParagraphStyle('TD', parent=styles['Normal'], fontSize=9, fontName='Helvetica', textColor=colors.HexColor('#111827'))
+
+    story.append(Paragraph("ΠΑΡΟΥΣΙΟΛΟΓΙΟ ΜΑΘΗΤΩΝ (ΤΜΗΜΑ: ΙΔΙΩΤΙΚΑ)", title_style))
+    story.append(Paragraph(f"ΗΜΕΡΟΜΗΝΙΑ: {date_str} | ΣΧΟΛΙΚΟ ΕΤΟΣ: {school_year}", sub_style))
+    story.append(Spacer(1, 5))
+
+    table_data = [[Paragraph("ΟΝΟΜΑΤΕΠΩΝΥΜΟ ΜΑΘΗΤΗ", th_style), Paragraph("ΠΡΟΓΡΑΜΜΑ", th_style), Paragraph("ΠΑΡΟΥΣΙΑ (ΝΑΙ/ΟΧΙ)", th_style)]]
+    for r in attendance_rows:
+        table_data.append([
+            Paragraph(remove_accents(str(r.get('name', ''))), td_style),
+            Paragraph(remove_accents(str(r.get('prog', ''))), td_style),
+            Paragraph(str(r.get('status', 'ΟΧΙ')), td_style)
+        ])
+
+    t = Table(table_data, colWidths=[220, 180, 140], repeatRows=1)
+    t.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1F2937')), ('ALIGN', (0,0), (-1,-1), 'LEFT'), ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#D1D5DB'))]))
+    story.append(t)
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
 def check_and_update_status_to_finish(c_id, school_year, program):
     try:
         gc = get_gspread_client()
@@ -566,6 +596,16 @@ else:
                             st.rerun()
                         except Exception as e:
                             st.error(f"Σφάλμα αποθήκευσης παρουσιών: {e}")
+                    # Κουμπί εξαγωγής/εκτύπωσης σε PDF εκτός της φόρμας για άμεση λήψη
+                st.markdown("<br>", unsafe_allow_html=True)
+                pdf_bytes = generate_single_attendance_pdf(pdf_preview_rows, target_date_str, selected_year_att)
+                if pdf_bytes:
+                    st.download_button(
+                        label="📥 Εκτύπωση / Λήψη Παρουσιολογίου Ημέρας (PDF)",
+                        data=pdf_bytes,
+                        file_name=f"parousiologio_{target_date_str}.pdf",
+                        mime="application/pdf"
+                    )
     #----------------------------------------------------------------------------------------------
     # --- ΣΕΛΙΔΑ: ΜΗΝΙΑΙΑ ΑΝΑΦΟΡΑ ΠΑΡΟΥΣΙΩΝ ---
     elif st.session_state.page == "monthly_attendance_report":
