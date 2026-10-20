@@ -1383,59 +1383,59 @@ elif st.session_state.page == "corp_payments":
 
 
 # --- ΣΕΛΙΔΑ: ΠΡΟΒΟΛΗ & ΦΙΛΤΡΑ ΕΞΟΔΩΝ ---
-elif st.session_state.page == "corp_payments_report":
-    if st.button("⬅️ Μενού", use_container_width=True): 
-        st.session_state.page = "menu"
-        st.rerun() 
+    elif st.session_state.page == "corp_payments_report":
+        if st.button("⬅️ Μενού", use_container_width=True): 
+            st.session_state.page = "menu"
+            st.rerun() 
+        
+        st.subheader("📊 Λίστα & Φίλτρα Εξόδων Επιχείρησης")
+        
+        try:
+            gc = get_gspread_client()
+            exp_df = pd.DataFrame(gc.open(OLD_SHEET_NAME).worksheet("db_payments_company").get_all_records())
+        except:
+            exp_df = pd.DataFrame()
     
-    st.subheader("📊 Λίστα & Φίλτρα Εξόδων Επιχείρησης")
-    
-    try:
-        gc = get_gspread_client()
-        exp_df = pd.DataFrame(gc.open(OLD_SHEET_NAME).worksheet("db_payments_company").get_all_records())
-    except:
-        exp_df = pd.DataFrame()
-
-    if exp_df.empty:
-        st.info("Δεν βρέθηκαν καταχωρημένα έξοδα στη βάση `db_payments_company`.")
-    else:
-        exp_df.columns = exp_df.columns.astype(str).str.strip()
-
-        if 'amount' in exp_df.columns:
-            exp_df['amount_numeric'] = pd.to_numeric(
-                exp_df['amount'].astype(str).str.replace(',', '.', regex=False), 
-                errors='coerce'
-            ).fillna(0.0)
-
-        col_f1, col_f2 = st.columns(2)
-        available_years = ["ΟΛΑ"] + sorted(exp_df['school_year'].dropna().astype(str).unique().tolist(), reverse=True) if 'school_year' in exp_df.columns else ["ΟΛΑ"]
-        sel_year_exp = col_f1.selectbox("📅 Φίλτρο ανά Σχολικό Έτος", options=available_years, key="exp_year_filter")
-
-        available_suppliers = ["ΟΛΑ"] + sorted(exp_df['company_name'].dropna().astype(str).unique().tolist()) if 'company_name' in exp_df.columns else ["ΟΛΑ"]
-        sel_sup_exp = col_f2.selectbox("🏢 Φίλτρο ανά Προμηθευτή", options=available_suppliers, key="exp_sup_filter")
-
-        filtered_exp = exp_df.copy()
-        if sel_year_exp != "ΟΛΑ":
-            filtered_exp = filtered_exp[filtered_exp['school_year'].astype(str).str.strip() == sel_year_exp]
-        if sel_sup_exp != "ΟΛΑ":
-            filtered_exp = filtered_exp[filtered_exp['company_name'].astype(str).str.strip() == sel_sup_exp]
-
-        st.markdown(f"**Βρέθηκαν έξοδα:** {len(filtered_exp)}")
-
-        if filtered_exp.empty:
-            st.info("Δεν βρέθηκαν έξοδα με τα επιλεγμένα φίλτρα.")
+        if exp_df.empty:
+            st.info("Δεν βρέθηκαν καταχωρημένα έξοδα στη βάση `db_payments_company`.")
         else:
-            display_exp_df = filtered_exp.copy()
-            if 'amount_numeric' in display_exp_df.columns:
-                display_exp_df['amount'] = display_exp_df['amount_numeric'].apply(lambda x: f"{x:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
-                drop_cols = [c for c in ['amount_numeric'] if c in display_exp_df.columns]
-                display_exp_df = display_exp_df.drop(columns=drop_cols)
-
-            st.dataframe(display_exp_df, use_container_width=True, hide_index=True)
-
-            if 'amount_numeric' in filtered_exp.columns:
-                total_exp_amt = filtered_exp['amount_numeric'].sum()
-                st.markdown(f"### 💰 **Συνολικό Ποσό Εξόδων:** `{total_exp_amt:,.2f} €`".replace(',', 'X').replace('.', ',').replace('X', '.'))
+            exp_df.columns = exp_df.columns.astype(str).str.strip()
+    
+            if 'amount' in exp_df.columns:
+                exp_df['amount_numeric'] = pd.to_numeric(
+                    exp_df['amount'].astype(str).str.replace(',', '.', regex=False), 
+                    errors='coerce'
+                ).fillna(0.0)
+    
+            col_f1, col_f2 = st.columns(2)
+            available_years = ["ΟΛΑ"] + sorted(exp_df['school_year'].dropna().astype(str).unique().tolist(), reverse=True) if 'school_year' in exp_df.columns else ["ΟΛΑ"]
+            sel_year_exp = col_f1.selectbox("📅 Φίλτρο ανά Σχολικό Έτος", options=available_years, key="exp_year_filter")
+    
+            available_suppliers = ["ΟΛΑ"] + sorted(exp_df['company_name'].dropna().astype(str).unique().tolist()) if 'company_name' in exp_df.columns else ["ΟΛΑ"]
+            sel_sup_exp = col_f2.selectbox("🏢 Φίλτρο ανά Προμηθευτή", options=available_suppliers, key="exp_sup_filter")
+    
+            filtered_exp = exp_df.copy()
+            if sel_year_exp != "ΟΛΑ":
+                filtered_exp = filtered_exp[filtered_exp['school_year'].astype(str).str.strip() == sel_year_exp]
+            if sel_sup_exp != "ΟΛΑ":
+                filtered_exp = filtered_exp[filtered_exp['company_name'].astype(str).str.strip() == sel_sup_exp]
+    
+            st.markdown(f"**Βρέθηκαν έξοδα:** {len(filtered_exp)}")
+    
+            if filtered_exp.empty:
+                st.info("Δεν βρέθηκαν έξοδα με τα επιλεγμένα φίλτρα.")
+            else:
+                display_exp_df = filtered_exp.copy()
+                if 'amount_numeric' in display_exp_df.columns:
+                    display_exp_df['amount'] = display_exp_df['amount_numeric'].apply(lambda x: f"{x:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
+                    drop_cols = [c for c in ['amount_numeric'] if c in display_exp_df.columns]
+                    display_exp_df = display_exp_df.drop(columns=drop_cols)
+    
+                st.dataframe(display_exp_df, use_container_width=True, hide_index=True)
+    
+                if 'amount_numeric' in filtered_exp.columns:
+                    total_exp_amt = filtered_exp['amount_numeric'].sum()
+                    st.markdown(f"### 💰 **Συνολικό Ποσό Εξόδων:** `{total_exp_amt:,.2f} €`".replace(',', 'X').replace('.', ',').replace('X', '.'))
 #------------------------------------------------------------------------------------    
     # --- ΣΕΛΙΔΑ: ΠΡΟΓΡΑΜΜΑΤΑ & ΤΜΗΜΑΤΑ ---
     elif st.session_state.page == "add_structure":
