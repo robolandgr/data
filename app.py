@@ -1353,7 +1353,10 @@ else:
         
         try:
             gc = get_gspread_client()
-            exp_df = pd.DataFrame(gc.open(OLD_SHEET_NAME).worksheet("db_payments_company").get_all_records())
+            # Ζητάμε τα δεδομένα ως raw/strings αν χρειάζεται, ή απλά τα διαβάζουμε:
+            worksheet = gc.open(OLD_SHEET_NAME).worksheet("db_payments_company")
+            # Χρησιμοποιούμε value_render_option='UNFORMATTED_VALUE' ή απλά παίρνουμε τα records
+            exp_df = pd.DataFrame(worksheet.get_all_records())
         except:
             exp_df = pd.DataFrame()
 
@@ -1362,17 +1365,19 @@ else:
         else:
             exp_df.columns = exp_df.columns.astype(str).str.strip()
 
-            # Ακριβής ανάγνωση ποσού χωρίς καμία αλλοίωση
+            # Ασφαλής και ακριβής ανάγνωση ποσού ΧΩΡΙΣ καμία διαίρεση
             if 'amount' in exp_df.columns:
                 def exact_amount(val):
                     if pd.isna(val) or str(val).strip() == '':
                         return 0.0
                     try:
-                        # Καθαρισμός από τυχόν σύμβολα ευρώ και μετατροπή ασφαλούς float
+                        # Μετατροπή σε string για να διαβάσουμε την ακριβή τιμή
                         val_str = str(val).strip().replace('€', '').strip()
-                        # Αν το string περιέχει κόμμα και όχι τελεία (π.χ. ελληνική μορφή 6,66)
-                        if ',' in val_str and '.' not in val_str:
-                            val_str = val_str.replace(',', '.')
+                        
+                        # Αν η Google Sheets το έστειλε ως float χωρίς διαχωριστικό επειδή έτσι το διάβασε το API,
+                        # το καθαρίζουμε. Αν έχει κόμμα, το κάνουμε τελεία.
+                        val_str = val_str.replace(',', '.')
+                        
                         return float(val_str)
                     except:
                         return 0.0
@@ -1399,7 +1404,6 @@ else:
             else:
                 display_exp_df = filtered_exp.copy()
                 if 'amount_numeric' in display_exp_df.columns:
-                    # Εμφάνιση ακριβώς όπως είναι αποθηκευμένο (π.χ. 6,66 €)
                     display_exp_df['amount'] = display_exp_df['amount_numeric'].apply(lambda x: f"{x:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
                     drop_cols = [c for c in ['amount_numeric'] if c in display_exp_df.columns]
                     display_exp_df = display_exp_df.drop(columns=drop_cols)
