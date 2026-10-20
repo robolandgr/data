@@ -1176,14 +1176,6 @@ else:
                 else:
                     full_name = f"Άγνωστος (ID: {c_id})"
 
-                # Συμφωνηθέν ποσό
-                adj_cost = 0.0
-                try:
-                    adj_str = str(reg.get('adjusted_cost', 0)).replace(',', '.')
-                    adj_cost = float(adj_str) if adj_str.strip() != '' else 0.0
-                except:
-                    adj_cost = 0.0
-
                 # Υπολογισμός συνολικών πληρωμών από τη βάση db_payments για τον μαθητή και το έτος
                 paid_sum = 0.0
                 if not pays_df.empty and 'id_customer' in pays_df.columns and 'amount_paid' in pays_df.columns:
@@ -1204,7 +1196,6 @@ else:
                 summary_rows.append({
                     'id_customer': c_id,
                     'Ονοματεπώνυμο': full_name,
-                    'Συμφωνηθέν (€)': adj_cost,
                     'Class': u_class,
                     'Έτος': s_year,
                     'Πληρωμένα (€)': paid_sum,
@@ -1216,18 +1207,16 @@ else:
                 st.info("Δεν βρέθηκαν δεδομένα μαθητών 'Ιδιωτικά' με τα επιλεγμένα φίλτρα.")
             else:
                 summary_df = summary_df.sort_values(by='Ονοματεπώνυμο', ascending=True)
-                st.dataframe(summary_df[['Ονοματεπώνυμο', 'Συμφωνηθέν (€)', 'Class', 'Έτος', 'Πληρωμένα (€)', 'Υπόλοιπο (€)']], use_container_width=True, hide_index=True)
+                st.dataframe(summary_df[['Ονοματεπώνυμο', 'Class', 'Έτος', 'Πληρωμένα (€', 'Υπόλοιπο (€)']], use_container_width=True, hide_index=True)
 
                 # --- ΥΠΟΛΟΓΙΣΜΟΣ ΚΑΙ ΕΜΦΑΝΙΣΗ ΣΥΝΟΛΙΚΩΝ ΠΟΣΩΝ ΚΑΤΩ ΑΠΟ ΤΟ GRID ---
-                tot_adj = summary_df['Συμφωνηθέν (€)'].sum()
                 tot_paid = summary_df['Πληρωμένα (€)'].sum()
                 tot_xreos = summary_df['Υπόλοιπο (€)'].sum()
 
                 st.markdown("<br>", unsafe_allow_html=True)
-                m1, m2, m3 = st.columns(3)
-                m1.metric("📌 Συνολικό Συμφωνηθέν", f"{tot_adj:.2f} €")
-                m2.metric("💳 Συνολικά Πληρωμένα", f"{tot_paid:.2f} €")
-                m3.metric("⚠️ Συνολικό Υπόλοιπο (Χρέος)", f"{tot_xreos:.2f} €")
+                m1, m2 = st.columns(2)
+                m1.metric("💳 Συνολικά Πληρωμένα", f"{tot_paid:.2f} €")
+                m2.metric("⚠️ Συνολικό Υπόλοιπο (Χρέος)", f"{tot_xreos:.2f} €")
                 st.markdown("<br>", unsafe_allow_html=True)
 
                 if st.button("📥 Εκτύπωση Συγκεντρωτικού Πίνακα (PDF)"):
