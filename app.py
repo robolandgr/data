@@ -396,8 +396,23 @@ if not st.session_state.logged_in:
             st.error(f"Σφάλμα σύνδεσης: {e}")       
 
 # ==================== MAIN APPLICATION ====================
-# --- 1. ΚΕΝΤΡΙΚΟ ΜΕΝΟΥ ---
-  if st.session_state.page == "menu":
+else:
+    st.sidebar.markdown(f"👤 **{st.session_state.username}** ({st.session_state.role.upper()})")
+    if st.sidebar.button("🚪 Έξοδος", use_container_width=True):
+        st.session_state.logged_in = False
+        st.session_state.page = "menu"
+        st.rerun()
+
+    if st.button("🔄 Ενημέρωση Δεδομένων", use_container_width=True, disabled=st.session_state.is_submitting):
+        st.session_state.is_submitting = True
+        load_specific_db.clear()
+        st.success("Τα δεδομένα ενημερώθηκαν επιτυχώς από τη Google!")
+        time.sleep(1)
+        st.session_state.is_submitting = False
+        st.rerun()
+    
+    # 1. ΚΕΝΤΡΙΚΟ ΜΕΝΟΥ
+if st.session_state.page == "menu":
     st.markdown("<h1 style='text-align: center;'>🤖 ROBOLAND DB</h1>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align: center;'>Κεντρικό Μενού Διαχείρισης</h2>", unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
@@ -1367,7 +1382,7 @@ if not st.session_state.logged_in:
                         st.rerun()
                     except Exception as e:
                         st.error(f"Σφάλμα αποθήκευσης εξόδου: {e}")
-#------------------------------------------------------------------
+
     # --- ΣΕΛΙΔΑ: ΠΡΟΒΟΛΗ & ΦΙΛΤΡΑ ΕΞΟΔΩΝ ---
     elif st.session_state.page == "corp_payments_report":
         if st.button("⬅️ Μενού", use_container_width=True): 
@@ -1412,58 +1427,7 @@ if not st.session_state.logged_in:
                 if 'amount' in filtered_exp.columns:
                     total_exp_amt = pd.to_numeric(filtered_exp['amount'], errors='coerce').fillna(0).sum()
                     st.markdown(f"### 💰 **Συνολικό Ποσό Εξόδων:** `{total_exp_amt:.2f} €`")
-#-------------------------------------------------------------------------------
-    # --- ΣΕΛΙΔΑ: ΚΑΤΑΧΩΡΗΣΗ ΕΤΑΙΡΕΙΩΝ / ΠΡΟΜΗΘΕΥΤΩΝ ---
-    elif st.session_state.page == "corp_suppliers_page":
-        if st.button("⬅️ Μενού", use_container_width=True): 
-            st.session_state.page = "menu"
-            st.rerun() 
-        
-        st.subheader("🏢 Καταχώρηση Νέας Εταιρείας / Προμηθευτή")
-        
-        with st.form("supplier_form"):
-            company_name = st.text_input("Επωνυμία Εταιρείας (Company Name)")
-            vat_number = st.text_input("ΑΦΜ (VAT Number)")
-            tax_office = st.text_input("ΔΟΥ (Tax Office)")
-            address = st.text_input("Διεύθυνση (Address)")
-            email = st.text_input("Email")
-            phone = st.text_input("Τηλέφωνο (Phone)")
-            
-            if st.form_submit_button("💾 Αποθήκευση Εταιρείας"):
-                if not company_name.strip():
-                    st.warning("⚠️ Παρακαλώ συμπληρώστε την επωνυμία της εταιρείας.")
-                else:
-                    try:
-                        gc = get_gspread_client()
-                        try:
-                            sh_comp = gc.open(OLD_SHEET_NAME).worksheet("db_customers_company")
-                        except:
-                            sh_comp = gc.open(OLD_SHEET_NAME).add_worksheet(title="db_customers_company", rows="1000", cols="10")
-                            sh_comp.append_row(["id", "company_name", "vat_number", "tax_office", "address", "email", "phone"])
-
-                        recs = sh_comp.get_all_records()
-                        nid = int(pd.DataFrame(recs)['id'].max()) + 1 if recs and 'id' in pd.DataFrame(recs).columns and not pd.DataFrame(recs).empty else 1
-                        
-                        sh_comp.append_row([nid, company_name, vat_number, tax_office, address, email, phone])
-                        st.success(f"✅ Η εταιρεία '{company_name}' αποθηκεύτηκε επιτυχώς!")
-                        time.sleep(1.1)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Σφάλμα αποθήκευσης εταιρείας: {e}")
-
-        st.markdown("---")
-        st.subheader("📋 Λίστα Καταχωρημένων Εταιρειών")
-        try:
-            gc = get_gspread_client()
-            comp_df = pd.DataFrame(gc.open(OLD_SHEET_NAME).worksheet("db_customers_company").get_all_records())
-            if not comp_df.empty:
-                comp_df.columns = comp_df.columns.astype(str).str.strip()
-                st.dataframe(comp_df, use_container_width=True, hide_index=True)
-            else:
-                st.info("Δεν υπάρχουν καταχωρημένες εταιρείες.")
-        except:
-            st.info("Δεν βρέθηκε το tab db_customers_company ή είναι κενό.")
-  #-----------------------------------------------------------------------------------------------------------          
+    
     # --- ΣΕΛΙΔΑ: ΠΡΟΓΡΑΜΜΑΤΑ & ΤΜΗΜΑΤΑ ---
     elif st.session_state.page == "add_structure":
         if st.button("⬅️ Μενού", use_container_width=True): 
@@ -1709,6 +1673,57 @@ if not st.session_state.logged_in:
                         st.download_button("📥 Κατεβάστε το αρχείο PDF", data=rep_pdf, file_name=f"mitroo_mathiton_{class_lower}.pdf", mime="application/pdf")
         else:
             st.info("Δεν βρέθηκαν εγγραφές στη βάση `db_registrations`.")
+
+    # --- ΣΕΛΙΔΑ: ΚΑΤΑΧΩΡΗΣΗ ΕΤΑΙΡΕΙΩΝ / ΠΡΟΜΗΘΕΥΤΩΝ ---
+    elif st.session_state.page == "corp_suppliers_page":
+        if st.button("⬅️ Μενού", use_container_width=True): 
+            st.session_state.page = "menu"
+            st.rerun() 
+        
+        st.subheader("🏢 Καταχώρηση Νέας Εταιρείας / Προμηθευτή")
+        
+        with st.form("supplier_form"):
+            company_name = st.text_input("Επωνυμία Εταιρείας (Company Name)")
+            vat_number = st.text_input("ΑΦΜ (VAT Number)")
+            tax_office = st.text_input("ΔΟΥ (Tax Office)")
+            address = st.text_input("Διεύθυνση (Address)")
+            email = st.text_input("Email")
+            phone = st.text_input("Τηλέφωνο (Phone)")
+            
+            if st.form_submit_button("💾 Αποθήκευση Εταιρείας"):
+                if not company_name.strip():
+                    st.warning("⚠️ Παρακαλώ συμπληρώστε την επωνυμία της εταιρείας.")
+                else:
+                    try:
+                        gc = get_gspread_client()
+                        try:
+                            sh_comp = gc.open(OLD_SHEET_NAME).worksheet("db_customers_company")
+                        except:
+                            sh_comp = gc.open(OLD_SHEET_NAME).add_worksheet(title="db_customers_company", rows="1000", cols="10")
+                            sh_comp.append_row(["id", "company_name", "vat_number", "tax_office", "address", "email", "phone"])
+
+                        recs = sh_comp.get_all_records()
+                        nid = int(pd.DataFrame(recs)['id'].max()) + 1 if recs and 'id' in pd.DataFrame(recs).columns and not pd.DataFrame(recs).empty else 1
+                        
+                        sh_comp.append_row([nid, company_name, vat_number, tax_office, address, email, phone])
+                        st.success(f"✅ Η εταιρεία '{company_name}' αποθηκεύτηκε επιτυχώς!")
+                        time.sleep(1.1)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Σφάλμα αποθήκευσης εταιρείας: {e}")
+
+        st.markdown("---")
+        st.subheader("📋 Λίστα Καταχωρημένων Εταιρειών")
+        try:
+            gc = get_gspread_client()
+            comp_df = pd.DataFrame(gc.open(OLD_SHEET_NAME).worksheet("db_customers_company").get_all_records())
+            if not comp_df.empty:
+                comp_df.columns = comp_df.columns.astype(str).str.strip()
+                st.dataframe(comp_df, use_container_width=True, hide_index=True)
+            else:
+                st.info("Δεν υπάρχουν καταχωρημένες εταιρείες.")
+        except:
+            st.info("Δεν βρέθηκε το tab db_customers_company ή είναι κενό.")
 #------------------------------------------------------------------------
     elif st.session_state.page == "unassigned_customers":
         if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun()
