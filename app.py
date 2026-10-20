@@ -273,15 +273,15 @@ def generate_report_pdf_customers(report_df, selected_year="ΟΛΑ", selected_cl
             ]
             t = Table(row_data, colWidths=[180, 150, 210])
 
-        else: # Voucher
-            m_bar = remove_accents(str(row.get('m_bardia', '')))
+        else: # Voucher (Εμφανίζει κανονικά τη Βάρδια - m_bardia)
+            m_bar = remove_accents(str(row.get('m_bardia', '')).strip())
             stop_d = remove_accents(str(row.get('stop_date', '')))
 
             row_data = [
                 [Paragraph("ΜΑΘΗΤΗΣ (VOUCHER):", label_style), Paragraph("ΓΟΝΕΑΣ:", label_style), Paragraph("ΤΗΛΕΦΩΝΟ / EMAIL:", label_style)],
                 [Paragraph(f"{lname} {fname}", name_style), Paragraph(f"{p_lname} {p_fname}", value_style), Paragraph(f"{tele} | {mail}", value_style)],
-                [Paragraph("ΚΑΤΑΣΤΑΣΗ:", label_style), Paragraph("ΒΑΡΔΙΑ:", label_style), Paragraph("ΗΜ. ΛΗΞΗΣ:", label_style)],
-                [Paragraph(status, value_style), Paragraph(m_bar, value_style), Paragraph(stop_d, value_style)]
+                [Paragraph("ΚΑΤΑΣΤΑΣΗ:", label_style), Paragraph("ΒΑΡΔΙΑ (M BARDIA):", label_style), Paragraph("ΗΜ. ΛΗΞΗΣ (STOP DATE):", label_style)],
+                [Paragraph(status, value_style), Paragraph(m_bar if m_bar and m_bar.lower() != 'nan' else '-', value_style), Paragraph(stop_d, value_style)]
             ]
             t = Table(row_data, colWidths=[180, 150, 210])
 
@@ -297,6 +297,7 @@ def generate_report_pdf_customers(report_df, selected_year="ΟΛΑ", selected_cl
     doc.build(story)
     buffer.seek(0)
     return buffer
+#---------------------------------------------------------------------------------
 def generate_summary_payments_pdf(summary_df, school_year_filter, class_filter):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
