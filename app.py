@@ -396,49 +396,75 @@ if not st.session_state.logged_in:
             st.error(f"Σφάλμα σύνδεσης: {e}")       
 
 # ==================== MAIN APPLICATION ====================
-else:
-    st.sidebar.markdown(f"👤 **{st.session_state.username}** ({st.session_state.role.upper()})")
-    if st.sidebar.button("🚪 Έξοδος", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.page = "menu"
-        st.rerun()
+# 1. ΚΕΝΤΡΙΚΟ ΜΕΝΟΥ
+    if st.session_state.page == "menu":
+        st.markdown("<h1 style='text-align: center;'>🤖 ROBOLAND DB</h1>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center;'>Κεντρικό Μενού Διαχείρισης</h2>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        st.subheader("Διαχείριση Πελατών / Μαθητών")
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            if st.button("➕ Νέος Πελάτης (Πρώτη Εγγραφή)", use_container_width=True):
+                st.session_state.page = "register"
+                st.rerun()
+            if st.button("📋 Επεξεργασία Στοιχείων Πελατών", use_container_width=True):
+                st.session_state.page = "customer_registry"
+                st.rerun()
+        with col_c2:
+            if st.button("👥 Διαχείριση Κατάστασης Πελατών (STOP/Επαναφορά)", use_container_width=True):
+                st.session_state.page = "view_customers"
+                st.rerun()
+            if st.button("🔄 Εισαγωγή Πελάτη σε Τμήμα", use_container_width=True):
+                st.session_state.page = "renew_registration"
+                st.rerun()
 
-    if st.button("🔄 Ενημέρωση Δεδομένων", use_container_width=True, disabled=st.session_state.is_submitting):
-        st.session_state.is_submitting = True
-        load_specific_db.clear()
-        st.success("Τα δεδομένα ενημερώθηκαν επιτυχώς από τη Google!")
-        time.sleep(1)
-        st.session_state.is_submitting = False
-        st.rerun()
-    
-    # --- ΣΕΛΙΔΑ: ΜΕΝΟΥ ΕΠΙΛΟΓΩΝ ---
-    elif st.session_state.page == "menu":
-        st.subheader("🏠 Κεντρικό Μενού Διαχείρισης")
-        
-        col_m1, col_m2 = st.columns(2)
-        
-        if col_m1.button("📋 Μητρώο Πελατών & Εγγραφών", use_container_width=True):
+        st.markdown("---")
+        st.subheader("Παρουσιολόγιο & Πληρωμές")
+        col_pr1, col_pr2 = st.columns(2)
+        with col_pr1:
+            if st.button("✅ Παρουσιολόγιο (Τμήμα Ιδιωτικά)", use_container_width=True):
+                st.session_state.page = "attendances_page"
+                st.rerun()
+        with col_pr2:
+            if st.button("💳 Καταχώρηση Πληρωμής (Συνδρομή)", use_container_width=True):
+                st.session_state.page = "add_payment"
+                st.rerun()
+
+        st.markdown("---")
+        st.subheader("Οικονομικά & Έξοδα")
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            if st.button("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή", use_container_width=True):
+                st.session_state.page = "payment_history_report"
+                st.rerun()
+            if st.button("🏢 Καταχώρηση Εταιρειών / Προμηθευτών", use_container_width=True):
+                st.session_state.page = "corp_suppliers_page"
+                st.rerun()
+        with col_p2:
+            if st.button("💸 Καταχώρηση Εξόδων", use_container_width=True):
+                st.session_state.page = "corp_payments"
+                st.rerun()
+            if st.button("📊 Προβολή & Φίλτρα Εξόδων", use_container_width=True):
+                st.session_state.page = "corp_payments_report"
+                st.rerun()
+
+        st.markdown("---")
+        st.subheader("Διαχείριση Κέντρου")
+        if st.button("📚 Τμήματα", use_container_width=True):
+            st.session_state.page = "add_structure"
+            st.rerun()
+
+        st.markdown("---")
+        st.subheader("Αναφορές")
+        if st.button("📋 Μητρώο Πελατών", use_container_width=True):
             st.session_state.page = "anafora_pelaton"
             st.rerun()
-            
-        if col_m2.button("✅ Παρουσιολόγιο (Ιδιωτικά)", use_container_width=True):
-            st.session_state.page = "attendances_page"
-            st.rerun()
-            
-        if col_m1.button("📊 Αναφορά & Ιστορικό Πληρωμών", use_container_width=True):
-            st.session_state.page = "payment_history_report"
-            st.rerun()
-            
-        if col_m2.button("💳 Καταχώρηση Εξόδων", use_container_width=True):
-            st.session_state.page = "corp_payments"
-            st.rerun()
 
-        if col_m1.button("🏢 Καταχώρηση Εταιρειών / Προμηθευτών", use_container_width=True):
-            st.session_state.page = "corp_suppliers_page"
-            st.rerun()
-
-        if col_m2.button("📊 Προβολή & Φίλτρα Εξόδων", use_container_width=True):
-            st.session_state.page = "corp_payments_report"
+        st.markdown("---")
+        st.markdown("##### 🔗 Διαχείριση Παραπόνων & Σχολίων")
+        if st.button("🛠️ Εισαγωγή/ Τροποποίηση Παραπόνων & Σχολίων", use_container_width=True):
+            st.session_state.page = "complaints_page"
             st.rerun()
 #----------------------------------------------------------------
     # --- ΣΕΛΙΔΑ: ΠΑΡΟΥΣΙΟΛΟΓΙΟ (ΤΜΗΜΑ: ΙΔΙΩΤΙΚΑ) ---
