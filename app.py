@@ -1310,77 +1310,75 @@ else:
                                         )
 #------------------------------------------------------------------------------------
     # --- ΣΕΛΙΔΑ: ΚΑΤΑΧΩΡΗΣΗ ΕΞΟΔΩΝ ---
-elif st.session_state.page == "corp_payments":
-    if st.button("⬅️ Μενού", use_container_width=True): 
-        st.session_state.page = "menu"
-        st.rerun() 
+    elif st.session_state.page == "corp_payments":
+        if st.button("⬅️ Μενού", use_container_width=True): 
+            st.session_state.page = "menu"
+            st.rerun() 
+        
+        st.subheader("💳 Καταχώρηση Εξόδων")
+        
+        suppliers_list = []
+        company_dict = {}
+        try:
+            gc = get_gspread_client()
+            comp_df = pd.DataFrame(gc.open(OLD_SHEET_NAME).worksheet("db_customers_company").get_all_records())
+            if not comp_df.empty:
+                comp_df.columns = comp_df.columns.astype(str).str.strip()
+                for _, r in comp_df.iterrows():
+                    c_id = str(r.get('id', '')).strip()
+                    c_name = str(r.get('company_name', '')).strip()
+                    if c_name:
+                        suppliers_list.append(c_name)
+                        company_dict[c_name] = c_id
+        except:
+            pass
     
-    st.subheader("💳 Καταχώρηση Εξόδων")
+        if not suppliers_list:
+            st.warning("⚠️ Δεν βρέθηκαν καταχωρημένες εταιρείες. Παρακαλώ καταχωρήστε πρώτα προμηθευτή.")
+            if st.button("➕ Μετάβαση σε Καταχώρηση Εταιρειών"):
+                st.session_state.page = "corp_suppliers_page"
+                st.rerun()
+        else:
+            with st.form("exp_form"):
+                inv = st.text_input("Αρ. Παραστατικού (Invoice Number)")
+                sup_name = st.selectbox("Προμηθευτής / Εταιρεία", options=suppliers_list)
+                school_yr = st.selectbox("Σχολικό Έτος", options=["2026-2027", "2027-2028", "2028-2029", "2029-2030"])
+                inv_date = st.date_input("Ημερομηνία Παραστατικού (Invoice Date)", value=datetime.today())
+                pay_date = st.date_input("Ημερομηνία Πληρωμής (Payment Date)", value=datetime.today())
+                amt = st.number_input("Ποσό (€)", min_value=0.0, format="%.2f")
+                pay_method = st.selectbox("Τρόπος Πληρωμής", options=["Μετρητά", "Κατάθεση", "POS", "Επιταγή"])
     
-    # Φόρτωση εταιρειών/προμηθευτών για το dropdown
-    suppliers_list = []
-    company_dict = {}
-    try:
-        gc = get_gspread_client()
-        comp_df = pd.DataFrame(gc.open(OLD_SHEET_NAME).worksheet("db_customers_company").get_all_records())
-        if not comp_df.empty:
-            comp_df.columns = comp_df.columns.astype(str).str.strip()
-            for _, r in comp_df.iterrows():
-                c_id = str(r.get('id', '')).strip()
-                c_name = str(r.get('company_name', '')).strip()
-                if c_name:
-                    suppliers_list.append(c_name)
-                    company_dict[c_name] = c_id
-    except:
-        pass
-
-    if not suppliers_list:
-        st.warning("⚠️ Δεν βρέθηκαν καταχωρημένες εταιρείες. Παρακαλώ καταχωρήστε πρώτα προμηθευτή.")
-        if st.button("➕ Μετάβαση σε Καταχώρηση Εταιρειών"):
-            st.session_state.page = "corp_suppliers_page"
-            st.rerun()
-    else:
-        with st.form("exp_form"):
-            inv = st.text_input("Αρ. Παραστατικού (Invoice Number)")
-            sup_name = st.selectbox("Προμηθευτής / Εταιρεία", options=suppliers_list)
-            school_yr = st.selectbox("Σχολικό Έτος", options=["2026-2027", "2027-2028", "2028-2029", "2029-2030"])
-            inv_date = st.date_input("Ημερομηνία Παραστατικού (Invoice Date)", value=datetime.today())
-            pay_date = st.date_input("Ημερομηνία Πληρωμής (Payment Date)", value=datetime.today())
-            amt = st.number_input("Ποσό (€)", min_value=0.0, format="%.2f")
-            pay_method = st.selectbox("Τρόπος Πληρωμής", options=["Μετρητά", "Κατάθεση", "POS", "Επιταγή"])
-
-            if st.form_submit_button("💾 Αποθήκευση Εξόδου"):
-                try:
-                    gc = get_gspread_client()
+                if st.form_submit_button("💾 Αποθήκευση Εξόδου"):
                     try:
-                        sh = gc.open(OLD_SHEET_NAME).worksheet("db_payments_company")
-                    except:
-                        sh = gc.open(OLD_SHEET_NAME).add_worksheet(title="db_payments_company", rows="1000", cols="12")
-                        sh.append_row([
-                            "id", "invoice_number", "type", "customer_id", "company_name", 
-                            "school_year", "invoice_date", "payment_date", "entry_date", "amount", "pay_method"
-                        ])
-
-                    recs = sh.get_all_records()
-                    nid = int(pd.DataFrame(recs)['id'].max()) + 1 if recs and 'id' in pd.DataFrame(recs).columns and not pd.DataFrame(recs).empty else 1
-                    
-                    selected_company_id = company_dict.get(sup_name, "")
-                    entry_date_str = datetime.today().strftime('%Y-%m-%d')
-                    inv_date_str = inv_date.strftime('%Y-%m-%d')
-                    pay_date_str = pay_date.strftime('%Y-%m-%d')
-
-                    row_data = [
-                        nid, inv, "Έξοδα", selected_company_id, sup_name, 
-                        school_yr, inv_date_str, pay_date_str, entry_date_str, amt, pay_method
-                    ]
-                    
-                    sh.append_row(row_data)
-                    st.success("✅ Το έξοδο αποθηκεύτηκε επιτυχώς!")
-                    time.sleep(1.1)
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Σφάλμα αποθήκευσης εξόδου: {e}")
-
+                        gc = get_gspread_client()
+                        try:
+                            sh = gc.open(OLD_SHEET_NAME).worksheet("db_payments_company")
+                        except:
+                            sh = gc.open(OLD_SHEET_NAME).add_worksheet(title="db_payments_company", rows="1000", cols="12")
+                            sh.append_row([
+                                "id", "invoice_number", "type", "customer_id", "company_name", 
+                                "school_year", "invoice_date", "payment_date", "entry_date", "amount", "pay_method"
+                            ])
+    
+                        recs = sh.get_all_records()
+                        nid = int(pd.DataFrame(recs)['id'].max()) + 1 if recs and 'id' in pd.DataFrame(recs).columns and not pd.DataFrame(recs).empty else 1
+                        
+                        selected_company_id = company_dict.get(sup_name, "")
+                        entry_date_str = datetime.today().strftime('%Y-%m-%d')
+                        inv_date_str = inv_date.strftime('%Y-%m-%d')
+                        pay_date_str = pay_date.strftime('%Y-%m-%d')
+    
+                        row_data = [
+                            nid, inv, "Έξοδα", selected_company_id, sup_name, 
+                            school_yr, inv_date_str, pay_date_str, entry_date_str, amt, pay_method
+                        ]
+                        
+                        sh.append_row(row_data)
+                        st.success("✅ Το έξοδο αποθηκεύτηκε επιτυχώς!")
+                        time.sleep(1.1)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Σφάλμα αποθήκευσης εξόδου: {e}")
 
 # --- ΣΕΛΙΔΑ: ΠΡΟΒΟΛΗ & ΦΙΛΤΡΑ ΕΞΟΔΩΝ ---
     elif st.session_state.page == "corp_payments_report":
