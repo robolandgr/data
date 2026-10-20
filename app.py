@@ -243,7 +243,6 @@ def generate_report_pdf_customers(report_df, selected_year="ΟΛΑ", selected_cl
     value_style = ParagraphStyle('Value', parent=styles['Normal'], fontSize=8.5, fontName='Helvetica', textColor=colors.HexColor('#111827'))
     name_style = ParagraphStyle('Name', parent=styles['Normal'], fontSize=9.5, fontName='Helvetica-Bold', textColor=colors.HexColor('#1F2937'))
 
-    # Τίτλος χωρίς Ιδιωτικά / Voucher
     story.append(Paragraph("ΜΗΤΡΩΟ ΜΑΘΗΤΩΝ", title_style))
     story.append(Paragraph(f"ΣΧΟΛΙΚΟ ΕΤΟΣ: {remove_accents(str(selected_year).upper())}", subtitle_style))
     story.append(Spacer(1, 5))
@@ -273,15 +272,21 @@ def generate_report_pdf_customers(report_df, selected_year="ΟΛΑ", selected_cl
             ]
             t = Table(row_data, colWidths=[180, 150, 210])
 
-        else: # Voucher (Εμφανίζει κανονικά τη Βάρδια - m_bardia)
-            m_bar = remove_accents(str(row.get('m_bardia', '')).strip())
+        else: # Voucher
+            # Ανίχνευση βάρδιας με διάφορα πιθανά ονόματα στηλών
+            m_bar = ""
+            for k in ['m_bardia', 'M Bardia', 'bardia', 'Βάρδια', 'βαρδια']:
+                if k in row and pd.notna(row[k]) and str(row[k]).strip().lower() != 'nan':
+                    m_bar = remove_accents(str(row[k]).strip())
+                    break
+            
             stop_d = remove_accents(str(row.get('stop_date', '')))
 
             row_data = [
                 [Paragraph("ΜΑΘΗΤΗΣ (VOUCHER):", label_style), Paragraph("ΓΟΝΕΑΣ:", label_style), Paragraph("ΤΗΛΕΦΩΝΟ / EMAIL:", label_style)],
                 [Paragraph(f"{lname} {fname}", name_style), Paragraph(f"{p_lname} {p_fname}", value_style), Paragraph(f"{tele} | {mail}", value_style)],
-                [Paragraph("ΚΑΤΑΣΤΑΣΗ:", label_style), Paragraph("ΒΑΡΔΙΑ (M BARDIA):", label_style), Paragraph("ΗΜ. ΛΗΞΗΣ (STOP DATE):", label_style)],
-                [Paragraph(status, value_style), Paragraph(m_bar if m_bar and m_bar.lower() != 'nan' else '-', value_style), Paragraph(stop_d, value_style)]
+                [Paragraph("ΚΑΤΑΣΤΑΣΗ:", label_style), Paragraph("ΒΑΡΔΙΑ:", label_style), Paragraph("ΗΜ. ΛΗΞΗΣ (STOP DATE):", label_style)],
+                [Paragraph(status, value_style), Paragraph(m_bar if m_bar else "-", value_style), Paragraph(stop_d, value_style)]
             ]
             t = Table(row_data, colWidths=[180, 150, 210])
 
@@ -1459,6 +1464,15 @@ else:
         if not reg_df.empty:
             reg_df.columns = reg_df.columns.astype(str).str.strip()
             
+            # Δυναμικός εντοπισμός και τυποποίηση της στήλης βάρδιας (στήλη M / m_bardia / bardia / Βάρδια)
+            bardia_col_found = None
+            for col in reg_df.columns:
+                if col.lower() in ['m_bardia', 'm bardia', 'bardia', 'βάρδια', 'βαρδια']:
+                    bardia_col_found = col
+                    break
+            if bardia_col_found and bardia_col_found != 'm_bardia':
+                reg_df = reg_df.rename(columns={bardia_col_found: 'm_bardia'})
+
             # Ενσωμάτωση στοιχείων γονέα και επικοινωνίας από το db_customers
             if not cust_df.empty:
                 cust_df.columns = cust_df.columns.astype(str).str.strip()
@@ -1522,7 +1536,6 @@ else:
                 else:
                     desired_cols = filtered_reg.columns.tolist()
 
-                # Κρατάμε μόνο όσες από τις επιθυμητές στήλες υπάρχουν στο DataFrame
                 existing_cols = [c for c in desired_cols if c in filtered_reg.columns]
                 grid_df = filtered_reg[existing_cols].copy()
 
@@ -1536,7 +1549,7 @@ else:
                     'email': 'Email',
                     'status': 'Κατάσταση',
                     'stop_date': 'Ημ. Λήξης',
-                    'm_bardia': 'Βάρδια (M Bardia)',
+                    'm_bardia': 'Βάρδια',
                     'adjusted_cost': 'Συμφωνηθέν Ποσό',
                     'energy': 'Τύπος Χρέωσης',
                     'xreos': 'Υπόλοιπο (Χρέος)'
