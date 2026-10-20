@@ -396,7 +396,7 @@ if not st.session_state.logged_in:
             st.error(f"Σφάλμα σύνδεσης: {e}")       
 
 # ==================== MAIN APPLICATION ====================
-# 1. ΚΕΝΤΡΙΚΟ ΜΕΝΟΥ
+    # 1. ΚΕΝΤΡΙΚΟ ΜΕΝΟΥ
     if st.session_state.page == "menu":
         st.markdown("<h1 style='text-align: center;'>🤖 ROBOLAND DB</h1>", unsafe_allow_html=True)
         st.markdown("<h2 style='text-align: center;'>Κεντρικό Μενού Διαχείρισης</h2>", unsafe_allow_html=True)
@@ -438,15 +438,9 @@ if not st.session_state.logged_in:
             if st.button("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή", use_container_width=True):
                 st.session_state.page = "payment_history_report"
                 st.rerun()
-            if st.button("🏢 Καταχώρηση Εταιρειών / Προμηθευτών", use_container_width=True):
-                st.session_state.page = "corp_suppliers_page"
-                st.rerun()
         with col_p2:
             if st.button("💸 Καταχώρηση Εξόδων", use_container_width=True):
                 st.session_state.page = "corp_payments"
-                st.rerun()
-            if st.button("📊 Προβολή & Φίλτρα Εξόδων", use_container_width=True):
-                st.session_state.page = "corp_payments_report"
                 st.rerun()
 
         st.markdown("---")
