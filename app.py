@@ -397,7 +397,7 @@ if not st.session_state.logged_in:
 
 # ==================== MAIN APPLICATION ====================
 # --- 1. ΚΕΝΤΡΙΚΟ ΜΕΝΟΥ ---
-if st.session_state.page == "menu":
+  if st.session_state.page == "menu":
     st.markdown("<h1 style='text-align: center;'>🤖 ROBOLAND DB</h1>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align: center;'>Κεντρικό Μενού Διαχείρισης</h2>", unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
