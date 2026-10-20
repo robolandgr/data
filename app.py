@@ -488,7 +488,7 @@ else:
         years_options = ["2026-2027", "2027-2028", "2028-2029", "2029-2030"]
         selected_year_att = st.selectbox("📅 Επιλογή Σχολικού Έτους", options=years_options)
         
-        # Επιλογή Ημερομηνίας (Σημερινή ή προηγούμενες ημέρες μέσω ημερολογίου)
+        # Επιλογή Ημερομηνίας
         selected_date_obj = st.date_input("📅 Επιλογή Ημερομηνίας Παρουσιολογίου", value=datetime.today())
         target_date_str = selected_date_obj.strftime('%Y-%m-%d')
         st.info(f"Επιλεγμένη Ημερομηνία Καταγραφής: **{target_date_str}** | Σχολικό Έτος: **{selected_year_att}**")
@@ -512,7 +512,6 @@ else:
             if priv_regs.empty:
                 st.info(f"Δεν βρέθηκαν μαθητές στο τμήμα 'Ιδιωτικά' για το σχολικό έτος {selected_year_att}.")
             else:
-                # Φόρτωση υπαρχουσών παρουσιών για την επιλεγμένη ημερομηνία και έτος
                 target_date_att = pd.DataFrame()
                 if not att_df.empty and 'date' in att_df.columns:
                     att_df.columns = att_df.columns.astype(str).str.strip()
@@ -533,7 +532,6 @@ else:
                         prog_name = str(r.get('program', '')).strip()
                         reg_id = str(r.get('id_registration', '')).strip()
                         
-                        # Παίρνουμε το adjusted_cost από την εγγραφή (db_registrations) ως τιμή μονάδας ανά παρουσία
                         adj_cost_val = 0.0
                         try:
                             adj_str = str(r.get('adjusted_cost', 0)).replace(',', '.')
@@ -541,7 +539,6 @@ else:
                         except:
                             adj_cost_val = 0.0
 
-                        # Έλεγχος αν υπάρχει ήδη καταχωρημένη παρουσία για την ημέρα αυτή
                         existing_rec = pd.DataFrame()
                         if not target_date_att.empty:
                             existing_rec = target_date_att[target_date_att['id_customer'].astype(str).str.strip() == c_id]
@@ -556,8 +553,7 @@ else:
                         col2.write(f"Πρόγραμμα: *{prog_name}* | Κόστος/Μάθημα: {adj_cost_val:.2f}€")
                         val = col3.toggle("ΝΑΙ / ΟΧΙ", value=default_val, key=f"att_{c_id}_{target_date_str}")
                         
-                        # Εντοπισμός πραγματικού row index στο Google Sheet για το db_registrations
-                        reg_row_index = idx + 2 # +2 λόγω header και 0-indexing
+                        reg_row_index = idx + 2
 
                         attendance_inputs[c_id] = {
                             'val': val,
@@ -578,7 +574,6 @@ else:
                         try:
                             gc = get_gspread_client()
                             
-                            # 1. Διαχείριση worksheet db_attendances
                             try:
                                 sh_att = gc.open(OLD_SHEET_NAME).worksheet("db_attendances")
                             except:
@@ -590,23 +585,28 @@ else:
                             
                             sh_reg = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
 
-                            # 2. Ενημέρωση παρουσιών ανά μαθητή
+                            # Φιλτράρουμε MONO όσους έχουν επιλεγεί ως "ΝΑΙ"
+                            rows_to_append_or_update = []
                             for c_id, data in attendance_inputs.items():
-                                status_str = "ΝΑΙ" if data['val'] else "ΟΧΙ"
-                                
+                                if data['val']:  # Αν πήρε παρουσία (ΝΑΙ)
+                                    rows_to_append_or_update.append((c_id, data))
+
+                            # Ενημέρωση βάσης παρουσιών ΜΟΝΟ για τα ΝΑΙ
+                            for c_id, data in rows_to_append_or_update:
                                 found_att = False
                                 if att_records:
                                     for ai, a_row in enumerate(att_records, start=2):
                                         if str(a_row.get('id_customer', '')).strip() == c_id and str(a_row.get('date', '')).strip() == target_date_str and str(a_row.get('school_year', '')).strip() == selected_year_att:
-                                            sh_att.update_cell(ai, 6, status_str)
+                                            sh_att.update_cell(ai, 6, "ΝΑΙ")
                                             found_att = True
                                             break
                                 if not found_att:
-                                    sh_att.append_row([next_att_id, c_id, f"{data['lname']} {data['fname']}", selected_year_att, target_date_str, status_str])
+                                    sh_att.append_row([next_att_id, c_id, f"{data['lname']} {data['fname']}", selected_year_att, target_date_str, "ΝΑΙ"])
                                     next_att_id += 1
 
-                                # 3. Υπολογισμός συνολικών "ΝΑΙ" για το συγκεκριμένο έτος και πολλαπλασιασμός με το adjusted_cost
+                                # Υπολογισμός χρέους
                                 current_att_df = pd.DataFrame(sh_att.get_all_records())
+                                user_total_nais = 0
                                 if not current_att_df.empty:
                                     current_att_df.columns = current_att_df.columns.astype(str).str.strip()
                                     user_total_nais = current_att_df[
@@ -614,23 +614,16 @@ else:
                                         (current_att_df['school_year'].astype(str).str.strip() == selected_year_att) &
                                         (current_att_df['status'].astype(str).str.strip().str.upper() == 'ΝΑΙ')
                                     ].shape[0]
-                                else:
-                                    user_total_nais = 1 if data['val'] else 0
 
-                                # Νέο χρέος (xreos) = Συνολικά ΝΑΙ * adjusted_cost
                                 calculated_xreos = user_total_nais * data['adj_cost']
+                                sh_reg.update_cell(data['reg_row_index'], 12, calculated_xreos)
 
-                                # Αποθήκευση του νέου xreos στη στήλη L (index 12 / στήλη 12) του db_registrations
-                                r_idx = data['reg_row_index']
-                                sh_reg.update_cell(r_idx, 12, calculated_xreos)
-
-                            st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε και οι χρεώσεις (xreos) ενημερώθηκαν επιτυχώς!")
+                            st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε επιτυχώς (καταχωρήθηκαν μόνο οι παρουσίες)!")
                             time.sleep(1.2)
                             st.rerun()
                         except Exception as e:
                             st.error(f"Σφάλμα αποθήκευσης παρουσιών: {e}")
 
-                # Κουμπί εξαγωγής/εκτύπωσης σε PDF εκτός της φόρμας για άμεση λήψη οποιουδήποτε παρουσιολογίου
                 st.markdown("<br>", unsafe_allow_html=True)
                 pdf_bytes = generate_single_attendance_pdf(pdf_preview_rows, target_date_str, selected_year_att)
                 if pdf_bytes:
