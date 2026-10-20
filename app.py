@@ -1137,17 +1137,17 @@ else:
             st.session_state.page = "menu"
             st.rerun()
 
-        st.subheader("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή (Τμήμα: Ιδιωτικά)")
+        st.subheader("📊 Αναφορά & Ιστορικό Πληρωμών")
         
         pays_df = load_specific_db("db_payments")
         cust_df = load_specific_db("db_customers")
         regs_df = load_specific_db("db_registrations")
 
         # --- ΦΙΛΤΡΟ ΕΤΟΥΣ ΓΙΑ ΤΟ ΣΥΓΚΕΝΤΡΩΤΙΚΟ GRID (ΜΟΝΟ ΙΔΙΩΤΙΚΑ) ---
-        st.markdown("### 📋 Συγκεντρωτικός Πίνακας Οικονομικών Μαθητών (Ιδιωτικά)")
+        st.markdown("### 📋 Οικονομική Αναφορά")
         
         all_years_opt = ["ΟΛΑ"] + (sorted(regs_df['school_year'].dropna().astype(str).unique().tolist(), reverse=True) if not regs_df.empty else ["2026-2027"])
-        sel_sum_year = st.selectbox("📅 Φίλτρο Έτους (Συγκεντρωτικού)", options=all_years_opt, key="sum_year_filter")
+        sel_sum_year = st.selectbox("📅 Επιλογή Σχολικού Έτους", options=all_years_opt, key="sum_year_filter")
 
         if regs_df.empty or cust_df.empty:
             st.info("Δεν βρέθηκαν δεδομένα εγγραφών ή πελατών.")
@@ -1207,7 +1207,7 @@ else:
                 st.info("Δεν βρέθηκαν δεδομένα μαθητών 'Ιδιωτικά' με τα επιλεγμένα φίλτρα.")
             else:
                 summary_df = summary_df.sort_values(by='Ονοματεπώνυμο', ascending=True)
-                st.dataframe(summary_df[['Ονοματεπώνυμο', 'Class', 'Έτος', 'Πληρωμένα (€', 'Υπόλοιπο (€)']], use_container_width=True, hide_index=True)
+                st.dataframe(summary_df[['Ονοματεπώνυμο', 'Class', 'Έτος', 'Πληρωμένα (€)', 'Υπόλοιπο (€)']], use_container_width=True, hide_index=True)
 
                 # --- ΥΠΟΛΟΓΙΣΜΟΣ ΚΑΙ ΕΜΦΑΝΙΣΗ ΣΥΝΟΛΙΚΩΝ ΠΟΣΩΝ ΚΑΤΩ ΑΠΟ ΤΟ GRID ---
                 tot_paid = summary_df['Πληρωμένα (€)'].sum()
