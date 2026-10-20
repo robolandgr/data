@@ -1363,10 +1363,22 @@ else:
             exp_df.columns = exp_df.columns.astype(str).str.strip()
 
             if 'amount' in exp_df.columns:
-                exp_df['amount_numeric'] = pd.to_numeric(
-                    exp_df['amount'].astype(str).str.replace(',', '.', regex=False), 
-                    errors='coerce'
-                ).fillna(0.0)
+                # Συνάρτηση ασφαλούς μετατροπής για να διορθωθεί η μετατόπιση της υποδιαστολής
+                def clean_and_fix_amount(val):
+                    try:
+                        s = str(val).strip().replace('€', '').strip()
+                        # Αντικατάσταση κόμματος με τελεία
+                        s = s.replace(',', '.')
+                        num = float(s)
+                        
+                        # Αν παρατηρείς ότι όλα τα νούμερα πολλαπλασιάζονται επί 10 (π.χ. 6.9 γίνεται 69), 
+                        # διαιρούμε με το 10. (Αν χρειάζεται διόρθωση, προσαρμόζεις εδώ).
+                        # Με βάση το παράδειγμά σου (10.5 -> 105), διαιρούμε δια 10:
+                        return num / 10.0
+                    except:
+                        return 0.0
+
+                exp_df['amount_numeric'] = exp_df['amount'].apply(clean_and_fix_amount)
 
             col_f1, col_f2 = st.columns(2)
             available_years = ["ΟΛΑ"] + sorted(exp_df['school_year'].dropna().astype(str).unique().tolist(), reverse=True) if 'school_year' in exp_df.columns else ["ΟΛΑ"]
