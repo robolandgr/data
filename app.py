@@ -1154,6 +1154,8 @@ else:
         else:
             regs_df.columns = regs_df.columns.astype(str).str.strip()
             cust_df.columns = cust_df.columns.astype(str).str.strip()
+            if not pays_df.empty:
+                pays_df.columns = pays_df.columns.astype(str).str.strip()
 
             # Φιλτράρισμα ΑΥΣΤΗΡΑ ΜΟΝΟ για class "Ιδιωτικά" και επιλεγμένο έτος
             filtered_regs = regs_df[regs_df['class'].astype(str).str.strip().str.lower() == 'ιδιωτικά'].copy()
@@ -1174,6 +1176,7 @@ else:
                 else:
                     full_name = f"Άγνωστος (ID: {c_id})"
 
+                # Συμφωνηθέν ποσό
                 adj_cost = 0.0
                 try:
                     adj_str = str(reg.get('adjusted_cost', 0)).replace(',', '.')
@@ -1181,21 +1184,22 @@ else:
                 except:
                     adj_cost = 0.0
 
+                # Υπολογισμός συνολικών πληρωμών από τη βάση db_payments για τον μαθητή και το έτος
                 paid_sum = 0.0
-                if not pays_df.empty:
-                    pays_df.columns = pays_df.columns.astype(str).str.strip()
+                if not pays_df.empty and 'id_customer' in pays_df.columns and 'amount_paid' in pays_df.columns:
                     p_match = pays_df[
                         (pays_df['id_customer'].astype(str).str.strip() == c_id) & 
                         (pays_df['school_year'].astype(str).str.strip() == s_year)
-                    ]
-                    paid_sum = pd.to_numeric(p_match.get('amount_paid', 0), errors='coerce').fillna(0).sum()
+                    ] if 'school_year' in pays_df.columns else pays_df[pays_df['id_customer'].astype(str).str.strip() == c_id]
+                    
+                    paid_sum = pd.to_numeric(p_match['amount_paid'], errors='coerce').fillna(0).sum()
 
-                # Αντλούμε το πραγματικό υπόλοιπο (xreos) απευθείας από τη βάση εγγραφών
+                # --- ΑΝΤΛΗΣΗ ΧΡΕΟΥΣ ΑΠΕΥΘΕΙΑΣ ΑΠΟ ΤΗ ΣΤΗΛΗ xreos ---
                 xreos_raw = reg.iloc[11] if len(reg) > 11 else reg.get('xreos', 0)
                 try:
                     xreos_val = float(str(xreos_raw).replace(',', '.') or 0.0)
                 except:
-                    xreos_val = max(0.0, adj_cost - paid_sum)
+                    xreos_val = 0.0
 
                 summary_rows.append({
                     'id_customer': c_id,
@@ -1230,7 +1234,6 @@ else:
         if cust_df.empty:
             st.info("Δεν βρέθηκαν δεδομένα πελατών.")
         else:
-            # Φιλτράρουμε τους πελάτες που έχουν τουλάχιστον μία εγγραφή στα "Ιδιωτικά"
             priv_customer_ids = regs_df[regs_df['class'].astype(str).str.strip().str.lower() == 'ιδιωτικά']['id_customer'].astype(str).unique()
             priv_cust_df = cust_df[cust_df['id_customer'].astype(str).isin(priv_customer_ids)].copy()
 
@@ -1252,7 +1255,6 @@ else:
                     if not regs_df.empty:
                         user_regs = regs_df[(regs_df['id_customer'].astype(str).str.strip() == c_id) & (regs_df['class'].astype(str).str.strip().str.lower() == 'ιδιωτικά')]
 
-                    # --- ΦΙΛΤΡΟ ΕΤΟΥΣ ΓΙΑ ΤΟΝ ΣΥΓΚΕΚΡΙΜΕΝΟ ΜΑΘΗΤΗ (ΧΩΡΙΣ CLASS) ---
                     st.markdown(f"#### ⚙️ Φίλτρο Έτους για: **{cust_full_name}**")
                     ind_years = ["ΟΛΑ"] + (sorted(user_regs['school_year'].dropna().astype(str).unique().tolist(), reverse=True) if not user_regs.empty else ["2026-2027"])
                     sel_ind_year = st.selectbox("📅 Έτος Μαθητή", options=ind_years, key="ind_year")
