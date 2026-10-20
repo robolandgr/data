@@ -1383,7 +1383,40 @@ else:
                     except Exception as e:
                         st.error(f"Σφάλμα αποθήκευσης εξόδου: {e}")
 
-    # --- ΣΕΛΙΔΑ: ΠΡΟΒΟΛΗ & ΦΙΛΤΡΑ ΕΞΟΔΩΝ ---
+    if st.form_submit_button("💾 Αποθήκευση Εξόδου"):
+                    try:
+                        gc = get_gspread_client()
+                        try:
+                            sh = gc.open(OLD_SHEET_NAME).worksheet("db_payments_company")
+                        except:
+                            sh = gc.open(OLD_SHEET_NAME).add_worksheet(title="db_payments_company", rows="1000", cols="12")
+                            sh.append_row([
+                                "id", "invoice_number", "type", "customer_id", "company_name", 
+                                "school_year", "invoice_date", "payment_date", "entry_date", "amount", "pay_method"
+                            ])
+
+                        recs = sh.get_all_records()
+                        nid = int(pd.DataFrame(recs)['id'].max()) + 1 if recs and 'id' in pd.DataFrame(recs).columns and not pd.DataFrame(recs).empty else 1
+                        
+                        selected_company_id = company_dict.get(sup_name, "")
+                        entry_date_str = datetime.today().strftime('%Y-%m-%d')
+                        inv_date_str = inv_date.strftime('%Y-%m-%d')
+                        pay_date_str = pay_date.strftime('%Y-%m-%d')
+
+                        row_data = [
+                            nid, inv, "Έξοδα", selected_company_id, sup_name, 
+                            school_yr, inv_date_str, pay_date_str, entry_date_str, amt, pay_method
+                        ]
+                        
+                        sh.append_row(row_data)
+                        st.success("✅ Το έξοδο αποθηκεύτηκε επιτυχώς!")
+                        time.sleep(1.1)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Σφάλμα αποθήκευσης εξόδου: {e}")
+
+
+# --- ΣΕΛΙΔΑ: ΠΡΟΒΟΛΗ & ΦΙΛΤΡΑ ΕΞΟΔΩΝ ---
     elif st.session_state.page == "corp_payments_report":
         if st.button("⬅️ Μενού", use_container_width=True): 
             st.session_state.page = "menu"
@@ -1402,24 +1435,7 @@ else:
         else:
             exp_df.columns = exp_df.columns.astype(str).str.strip()
     
-            # ΔΙΟΡΘΩΣΗ & ΜΟΡΦΟΠΟΙΗΣΗ ΤΩΝ ΠΟΣΩΝ (AMOUNT)
             if 'amount' in exp_df.columns:
-                # Μετατρέπουμε σε string, αντικαθιστούμε τυχόν κόμματα με τελείες και το κάνουμε numeric
-                exp_df['amount_clean'] = (
-                    exp_df['amount']
-                    .astype(str)
-                    .str.replace('€', '', regex=True)
-                    .str.strip()
-                    .str.replace('.', '', regex=False) # Αν υπάρχουν τελείες χιλιάδων (προαιρετικά, ανάλογα με το input)
-                    .str.replace(',', '.', regex=False)
-                )
-                # Αν τα ποσά αποθηκεύτηκαν χωρίς δεκαδικό διαχωριστικό (π.χ. 101055 αντί για 1010.55), 
-                # συνήθως στη Google Sheets αποθηκεύονται σωστά. Εδώ τα κάνουμε ασφαλή float:
-                exp_df['amount_numeric'] = pd.to_numeric(exp_df['amount_clean'], errors='coerce').fillna(0.0)
-                
-                # Διόρθωση αν η Google Sheets τα έσωσε πολλαπλασιασμένα επί 100 λόγω έλλειψης υποδιαστολής (π.χ. 101055 -> 1010.55)
-                # Αν αποθηκεύονται κανονικά ως floats (π.χ. 1010.55), αφαιρούμε την διαίρεση με το 100. 
-                # Με βάση το μήνυμά σου (amount1010,55), τα διαβάζει σωστά αν αντικατασταθεί το κόμμα.
                 exp_df['amount_numeric'] = pd.to_numeric(
                     exp_df['amount'].astype(str).str.replace(',', '.', regex=False), 
                     errors='coerce'
@@ -1443,17 +1459,14 @@ else:
             if filtered_exp.empty:
                 st.info("Δεν βρέθηκαν έξοδα με τα επιλεγμένα φίλτρα.")
             else:
-                # Δημιουργία καθαρού DataFrame για την εμφάνιση με μορφοποιημένο ποσό
                 display_exp_df = filtered_exp.copy()
                 if 'amount_numeric' in display_exp_df.columns:
                     display_exp_df['amount'] = display_exp_df['amount_numeric'].apply(lambda x: f"{x:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
-                    # Αφαιρούμε τα προσωρινά βοηθητικά πεδία από την εμφάνιση
-                    drop_cols = [c for c in ['amount_clean', 'amount_numeric'] if c in display_exp_df.columns]
+                    drop_cols = [c for c in ['amount_numeric'] if c in display_exp_df.columns]
                     display_exp_df = display_exp_df.drop(columns=drop_cols)
     
                 st.dataframe(display_exp_df, use_container_width=True, hide_index=True)
     
-                # Υπολογισμός συνολικού ποσού με ασφάλεια
                 if 'amount_numeric' in filtered_exp.columns:
                     total_exp_amt = filtered_exp['amount_numeric'].sum()
                     st.markdown(f"### 💰 **Συνολικό Ποσό Εξόδων:** `{total_exp_amt:,.2f} €`".replace(',', 'X').replace('.', ',').replace('X', '.'))
