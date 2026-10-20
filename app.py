@@ -411,69 +411,34 @@ else:
         st.session_state.is_submitting = False
         st.rerun()
     
-    # 1. ΚΕΝΤΡΙΚΟ ΜΕΝΟΥ
-    if st.session_state.page == "menu":
-        st.markdown("<h1 style='text-align: center;'>🤖 ROBOLAND DB</h1>", unsafe_allow_html=True)
-        st.markdown("<h2 style='text-align: center;'>Κεντρικό Μενού Διαχείρισης</h2>", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
+    # --- ΣΕΛΙΔΑ: ΜΕΝΟΥ ΕΠΙΛΟΓΩΝ ---
+    elif st.session_state.page == "menu":
+        st.subheader("🏠 Κεντρικό Μενού Διαχείρισης")
         
-        st.subheader("Διαχείριση Πελατών / Μαθητών")
-        col_c1, col_c2 = st.columns(2)
-        with col_c1:
-            if st.button("➕ Νέος Πελάτης (Πρώτη Εγγραφή)", use_container_width=True):
-                st.session_state.page = "register"
-                st.rerun()
-            if st.button("📋 Επεξεργασία Στοιχείων Πελατών", use_container_width=True):
-                st.session_state.page = "customer_registry"
-                st.rerun()
-        with col_c2:
-            if st.button("👥 Διαχείριση Κατάστασης Πελατών (STOP/Επαναφορά)", use_container_width=True):
-                st.session_state.page = "view_customers"
-                st.rerun()
-            if st.button("🔄 Εισαγωγή Πελάτη σε Τμήμα", use_container_width=True):
-                st.session_state.page = "renew_registration"
-                st.rerun()
-
-        st.markdown("---")
-        st.subheader("Παρουσιολόγιο & Πληρωμές")
-        col_pr1, col_pr2 = st.columns(2)
-        with col_pr1:
-            if st.button("✅ Παρουσιολόγιο (Τμήμα Ιδιωτικά)", use_container_width=True):
-                st.session_state.page = "attendances_page"
-                st.rerun()
-        with col_pr2:
-            if st.button("💳 Καταχώρηση Πληρωμής (Συνδρομή)", use_container_width=True):
-                st.session_state.page = "add_payment"
-                st.rerun()
-
-        st.markdown("---")
-        st.subheader("Οικονομικά & Έξοδα")
-        col_p1, col_p2 = st.columns(2)
-        with col_p1:
-            if st.button("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή", use_container_width=True):
-                st.session_state.page = "payment_history_report"
-                st.rerun()
-        with col_p2:
-            if st.button("💸 Καταχώρηση Εξόδων", use_container_width=True):
-                st.session_state.page = "corp_payments"
-                st.rerun()
-
-        st.markdown("---")
-        st.subheader("Διαχείριση Κέντρου")
-        if st.button("📚 Τμήματα", use_container_width=True):
-            st.session_state.page = "add_structure"
-            st.rerun()
-
-        st.markdown("---")
-        st.subheader("Αναφορές")
-        if st.button("📋 Μητρώο Πελατών", use_container_width=True):
+        col_m1, col_m2 = st.columns(2)
+        
+        if col_m1.button("📋 Μητρώο Πελατών & Εγγραφών", use_container_width=True):
             st.session_state.page = "anafora_pelaton"
             st.rerun()
+            
+        if col_m2.button("✅ Παρουσιολόγιο (Ιδιωτικά)", use_container_width=True):
+            st.session_state.page = "attendances_page"
+            st.rerun()
+            
+        if col_m1.button("📊 Αναφορά & Ιστορικό Πληρωμών", use_container_width=True):
+            st.session_state.page = "payment_history_report"
+            st.rerun()
+            
+        if col_m2.button("💳 Καταχώρηση Εξόδων", use_container_width=True):
+            st.session_state.page = "corp_payments"
+            st.rerun()
 
-        st.markdown("---")
-        st.markdown("##### 🔗 Διαχείριση Παραπόνων & Σχολίων")
-        if st.button("🛠️ Εισαγωγή/ Τροποποίηση Παραπόνων & Σχολίων", use_container_width=True):
-            st.session_state.page = "complaints_page"
+        if col_m1.button("🏢 Καταχώρηση Εταιρειών / Προμηθευτών", use_container_width=True):
+            st.session_state.page = "corp_suppliers_page"
+            st.rerun()
+
+        if col_m2.button("📊 Προβολή & Φίλτρα Εξόδων", use_container_width=True):
+            st.session_state.page = "corp_payments_report"
             st.rerun()
 #----------------------------------------------------------------
     # --- ΣΕΛΙΔΑ: ΠΑΡΟΥΣΙΟΛΟΓΙΟ (ΤΜΗΜΑ: ΙΔΙΩΤΙΚΑ) ---
@@ -1303,22 +1268,176 @@ else:
                                             mime="application/pdf"
                                         )
 #------------------------------------------------------------------------------------
+    # --- ΣΕΛΙΔΑ: ΚΑΤΑΧΩΡΗΣΗ ΕΞΟΔΩΝ ---
     elif st.session_state.page == "corp_payments":
-        if st.button("⬅️ Μενού", use_container_width=True): st.session_state.page = "menu"; st.rerun() 
-        st.subheader("Καταχώρηση Εξόδων")
-        with st.form("exp"):
-            inv = st.text_input("Αρ. Παραστατικού")
-            sup = st.text_input("Προμηθευτής")
-            amt = st.number_input("Ποσό (€)", min_value=0.0)
-            if st.form_submit_button("💾 Αποθήκευση"):
-                gc = get_gspread_client()
-                sh = gc.open(OLD_SHEET_NAME).worksheet("db_payments_company")
-                recs = sh.get_all_records()
-                nid = int(pd.DataFrame(reg['id']).max()) + 1 if recs and 'id' in pd.DataFrame(recs).columns else 1
-                sh.append_row([nid, inv, "Έξοδα", "", sup, "2026-2027", datetime.today().strftime('%Y-%m-%d'), datetime.today().strftime('%Y-%m-%d'), datetime.today().strftime('%Y-%m-%d'), amt, "Μετρητά"])
-                st.success("✅ Το έξοδο αποθηκεύτηκε!")
-                st.rerun()
+        if st.button("⬅️ Μενού", use_container_width=True): 
+            st.session_state.page = "menu"
+            st.rerun() 
+        
+        st.subheader("💳 Καταχώρηση Εξόδων")
+        
+        # Φόρτωση εταιρειών/προμηθευτών για το dropdown
+        suppliers_list = []
+        company_dict = {}
+        try:
+            gc = get_gspread_client()
+            comp_df = pd.DataFrame(gc.open(OLD_SHEET_NAME).worksheet("db_customers_company").get_all_records())
+            if not comp_df.empty:
+                comp_df.columns = comp_df.columns.astype(str).str.strip()
+                for _, r in comp_df.iterrows():
+                    c_id = str(r.get('id', '')).strip()
+                    c_name = str(r.get('company_name', '')).strip()
+                    if c_name:
+                        suppliers_list.append(c_name)
+                        company_dict[c_name] = c_id
+        except:
+            pass
 
+        if not suppliers_list:
+            st.warning("⚠️ Δεν βρέθηκαν καταχωρημένες εταιρείες. Παρακαλώ καταχωρήστε πρώτα προμηθευτή.")
+            if st.button("➕ Μετάβαση σε Καταχώρηση Εταιρειών"):
+                st.session_state.page = "corp_suppliers_page"
+                st.rerun()
+        else:
+            with st.form("exp_form"):
+                inv = st.text_input("Αρ. Παραστατικού (Invoice Number)")
+                sup_name = st.selectbox("Προμηθευτής / Εταιρεία", options=suppliers_list)
+                school_yr = st.selectbox("Σχολικό Έτος", options=["2026-2027", "2027-2028", "2028-2029", "2029-2030"])
+                inv_date = st.date_input("Ημερομηνία Παραστατικού (Invoice Date)", value=datetime.today())
+                pay_date = st.date_input("Ημερομηνία Πληρωμής (Payment Date)", value=datetime.today())
+                amt = st.number_input("Ποσό (€)", min_value=0.0, format="%.2f")
+                pay_method = st.selectbox("Τρόπος Πληρωμής", options=["Μετρητά", "Κατάθεση", "POS", "Επιταγή"])
+
+                if st.form_submit_button("💾 Αποθήκευση Εξόδου"):
+                    try:
+                        gc = get_gspread_client()
+                        try:
+                            sh = gc.open(OLD_SHEET_NAME).worksheet("db_payments_company")
+                        except:
+                            sh = gc.open(OLD_SHEET_NAME).add_worksheet(title="db_payments_company", rows="1000", cols="12")
+                            sh.append_row([
+                                "id", "invoice_number", "type", "customer_id", "company_name", 
+                                "school_year", "invoice_date", "payment_date", "entry_date", "amount", "pay_method"
+                            ])
+
+                        recs = sh.get_all_records()
+                        nid = int(pd.DataFrame(recs)['id'].max()) + 1 if recs and 'id' in pd.DataFrame(recs).columns and not pd.DataFrame(recs).empty else 1
+                        
+                        selected_company_id = company_dict.get(sup_name, "")
+                        entry_date_str = datetime.today().strftime('%Y-%m-%d')
+                        inv_date_str = inv_date.strftime('%Y-%m-%d')
+                        pay_date_str = pay_date.strftime('%Y-%m-%d')
+
+                        # Σειρά αποθήκευσης ακριβώς όπως ζητήθηκε:
+                        # id, invoice_number, type, customer_id, company_name, school_year, invoice_date, payment_date, entry_date, amount, pay_method
+                        row_data = [
+                            nid, inv, "Έξοδα", selected_company_id, sup_name, 
+                            school_yr, inv_date_str, pay_date_str, entry_date_str, amt, pay_method
+                        ]
+                        
+                        sh.append_row(row_data)
+                        st.success("✅ Το έξοδο αποθηκεύτηκε επιτυχώς!")
+                        time.sleep(1.1)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Σφάλμα αποθήκευσης εξόδου: {e}")
+#------------------------------------------------------------------
+    # --- ΣΕΛΙΔΑ: ΠΡΟΒΟΛΗ & ΦΙΛΤΡΑ ΕΞΟΔΩΝ ---
+    elif st.session_state.page == "corp_payments_report":
+        if st.button("⬅️ Μενού", use_container_width=True): 
+            st.session_state.page = "menu"
+            st.rerun() 
+        
+        st.subheader("📊 Λίστα & Φίλτρα Εξόδων Επιχείρησης")
+        
+        try:
+            gc = get_gspread_client()
+            exp_df = pd.DataFrame(gc.open(OLD_SHEET_NAME).worksheet("db_payments_company").get_all_records())
+        except:
+            exp_df = pd.DataFrame()
+
+        if exp_df.empty:
+            st.info("Δεν βρέθηκαν καταχωρημένα έξοδα στη βάση `db_payments_company`.")
+        else:
+            exp_df.columns = exp_df.columns.astype(str).str.strip()
+
+            # Φίλτρα
+            col_f1, col_f2 = st.columns(2)
+            available_years = ["ΟΛΑ"] + sorted(exp_df['school_year'].dropna().astype(str).unique().tolist(), reverse=True) if 'school_year' in exp_df.columns else ["ΟΛΑ"]
+            sel_year_exp = col_f1.selectbox("📅 Φίλτρο ανά Σχολικό Έτος", options=available_years, key="exp_year_filter")
+
+            available_suppliers = ["ΟΛΑ"] + sorted(exp_df['company_name'].dropna().astype(str).unique().tolist()) if 'company_name' in exp_df.columns else ["ΟΛΑ"]
+            sel_sup_exp = col_f2.selectbox("🏢 Φίλτρο ανά Προμηθευτή", options=available_suppliers, key="exp_sup_filter")
+
+            filtered_exp = exp_df.copy()
+            if sel_year_exp != "ΟΛΑ":
+                filtered_exp = filtered_exp[filtered_exp['school_year'].astype(str).str.strip() == sel_year_exp]
+            if sel_sup_exp != "ΟΛΑ":
+                filtered_exp = filtered_exp[filtered_exp['company_name'].astype(str).str.strip() == sel_sup_exp]
+
+            st.markdown(f"**Βρέθηκαν έξοδα:** {len(filtered_exp)}")
+
+            if filtered_exp.empty:
+                st.info("Δεν βρέθηκαν έξοδα με τα επιλεγμένα φίλτρα.")
+            else:
+                st.dataframe(filtered_exp, use_container_width=True, hide_index=True)
+
+                # Υπολογισμός συνολικού ποσού
+                if 'amount' in filtered_exp.columns:
+                    total_exp_amt = pd.to_numeric(filtered_exp['amount'], errors='coerce').fillna(0).sum()
+                    st.markdown(f"### 💰 **Συνολικό Ποσό Εξόδων:** `{total_exp_amt:.2f} €`")
+#-------------------------------------------------------------------------------
+    # --- ΣΕΛΙΔΑ: ΚΑΤΑΧΩΡΗΣΗ ΕΤΑΙΡΕΙΩΝ / ΠΡΟΜΗΘΕΥΤΩΝ ---
+    elif st.session_state.page == "corp_suppliers_page":
+        if st.button("⬅️ Μενού", use_container_width=True): 
+            st.session_state.page = "menu"
+            st.rerun() 
+        
+        st.subheader("🏢 Καταχώρηση Νέας Εταιρείας / Προμηθευτή")
+        
+        with st.form("supplier_form"):
+            company_name = st.text_input("Επωνυμία Εταιρείας (Company Name)")
+            vat_number = st.text_input("ΑΦΜ (VAT Number)")
+            tax_office = st.text_input("ΔΟΥ (Tax Office)")
+            address = st.text_input("Διεύθυνση (Address)")
+            email = st.text_input("Email")
+            phone = st.text_input("Τηλέφωνο (Phone)")
+            
+            if st.form_submit_button("💾 Αποθήκευση Εταιρείας"):
+                if not company_name.strip():
+                    st.warning("⚠️ Παρακαλώ συμπληρώστε την επωνυμία της εταιρείας.")
+                else:
+                    try:
+                        gc = get_gspread_client()
+                        try:
+                            sh_comp = gc.open(OLD_SHEET_NAME).worksheet("db_customers_company")
+                        except:
+                            sh_comp = gc.open(OLD_SHEET_NAME).add_worksheet(title="db_customers_company", rows="1000", cols="10")
+                            sh_comp.append_row(["id", "company_name", "vat_number", "tax_office", "address", "email", "phone"])
+
+                        recs = sh_comp.get_all_records()
+                        nid = int(pd.DataFrame(recs)['id'].max()) + 1 if recs and 'id' in pd.DataFrame(recs).columns and not pd.DataFrame(recs).empty else 1
+                        
+                        sh_comp.append_row([nid, company_name, vat_number, tax_office, address, email, phone])
+                        st.success(f"✅ Η εταιρεία '{company_name}' αποθηκεύτηκε επιτυχώς!")
+                        time.sleep(1.1)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Σφάλμα αποθήκευσης εταιρείας: {e}")
+
+        st.markdown("---")
+        st.subheader("📋 Λίστα Καταχωρημένων Εταιρειών")
+        try:
+            gc = get_gspread_client()
+            comp_df = pd.DataFrame(gc.open(OLD_SHEET_NAME).worksheet("db_customers_company").get_all_records())
+            if not comp_df.empty:
+                comp_df.columns = comp_df.columns.astype(str).str.strip()
+                st.dataframe(comp_df, use_container_width=True, hide_index=True)
+            else:
+                st.info("Δεν υπάρχουν καταχωρημένες εταιρείες.")
+        except:
+            st.info("Δεν βρέθηκε το tab db_customers_company ή είναι κενό.")
+  #-----------------------------------------------------------------------------------------------------------          
     # --- ΣΕΛΙΔΑ: ΠΡΟΓΡΑΜΜΑΤΑ & ΤΜΗΜΑΤΑ ---
     elif st.session_state.page == "add_structure":
         if st.button("⬅️ Μενού", use_container_width=True): 
