@@ -1218,6 +1218,18 @@ else:
                 summary_df = summary_df.sort_values(by='Ονοματεπώνυμο', ascending=True)
                 st.dataframe(summary_df[['Ονοματεπώνυμο', 'Συμφωνηθέν (€)', 'Class', 'Έτος', 'Πληρωμένα (€)', 'Υπόλοιπο (€)']], use_container_width=True, hide_index=True)
 
+                # --- ΥΠΟΛΟΓΙΣΜΟΣ ΚΑΙ ΕΜΦΑΝΙΣΗ ΣΥΝΟΛΙΚΩΝ ΠΟΣΩΝ ΚΑΤΩ ΑΠΟ ΤΟ GRID ---
+                tot_adj = summary_df['Συμφωνηθέν (€)'].sum()
+                tot_paid = summary_df['Πληρωμένα (€)'].sum()
+                tot_xreos = summary_df['Υπόλοιπο (€)'].sum()
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                m1, m2, m3 = st.columns(3)
+                m1.metric("📌 Συνολικό Συμφωνηθέν", f"{tot_adj:.2f} €")
+                m2.metric("💳 Συνολικά Πληρωμένα", f"{tot_paid:.2f} €")
+                m3.metric("⚠️ Συνολικό Υπόλοιπο (Χρέος)", f"{tot_xreos:.2f} €")
+                st.markdown("<br>", unsafe_allow_html=True)
+
                 if st.button("📥 Εκτύπωση Συγκεντρωτικού Πίνακα (PDF)"):
                     pdf_sum_buf = generate_summary_payments_pdf(summary_df, sel_sum_year, "Ιδιωτικά")
                     if pdf_sum_buf:
