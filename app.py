@@ -1362,18 +1362,22 @@ else:
         else:
             exp_df.columns = exp_df.columns.astype(str).str.strip()
 
-            # Απλή και ασφαλής ανάγνωση του ποσού ΑΚΡΙΒΩΣ όπως είναι στο Google Sheet
+            # Ακριβής ανάγνωση ποσού χωρίς καμία αλλοίωση
             if 'amount' in exp_df.columns:
-                def clean_amount(val):
+                def exact_amount(val):
+                    if pd.isna(val) or str(val).strip() == '':
+                        return 0.0
                     try:
-                        s = str(val).strip().replace('€', '').strip()
-                        # Μετατροπή κόμματος σε τελεία αν υπάρχει για να διαβαστεί σωστά ως float
-                        s = s.replace(',', '.')
-                        return float(s)
+                        # Καθαρισμός από τυχόν σύμβολα ευρώ και μετατροπή ασφαλούς float
+                        val_str = str(val).strip().replace('€', '').strip()
+                        # Αν το string περιέχει κόμμα και όχι τελεία (π.χ. ελληνική μορφή 6,66)
+                        if ',' in val_str and '.' not in val_str:
+                            val_str = val_str.replace(',', '.')
+                        return float(val_str)
                     except:
                         return 0.0
 
-                exp_df['amount_numeric'] = exp_df['amount'].apply(clean_amount)
+                exp_df['amount_numeric'] = exp_df['amount'].apply(exact_amount)
 
             col_f1, col_f2 = st.columns(2)
             available_years = ["ΟΛΑ"] + sorted(exp_df['school_year'].dropna().astype(str).unique().tolist(), reverse=True) if 'school_year' in exp_df.columns else ["ΟΛΑ"]
@@ -1395,7 +1399,7 @@ else:
             else:
                 display_exp_df = filtered_exp.copy()
                 if 'amount_numeric' in display_exp_df.columns:
-                    # Μορφοποίηση μόνο για την ομορφιά του πίνακα (π.χ. 6,66 €)
+                    # Εμφάνιση ακριβώς όπως είναι αποθηκευμένο (π.χ. 6,66 €)
                     display_exp_df['amount'] = display_exp_df['amount_numeric'].apply(lambda x: f"{x:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
                     drop_cols = [c for c in ['amount_numeric'] if c in display_exp_df.columns]
                     display_exp_df = display_exp_df.drop(columns=drop_cols)
@@ -1405,7 +1409,7 @@ else:
                 if 'amount_numeric' in filtered_exp.columns:
                     total_exp_amt = filtered_exp['amount_numeric'].sum()
                     st.markdown(f"### 💰 **Συνολικό Ποσό Εξόδων:** `{total_exp_amt:,.2f} €`".replace(',', 'X').replace('.', ',').replace('X', '.'))
-
+                    
     # --- ΣΕΛΙΔΑ: ΠΡΟΓΡΑΜΜΑΤΑ & ΤΜΗΜΑΤΑ ---
     elif st.session_state.page == "add_structure":
         if st.button("⬅️ Μενού", use_container_width=True): 
