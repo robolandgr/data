@@ -584,6 +584,7 @@ else:
                             next_att_id = int(pd.DataFrame(att_records)['id_attendance'].max()) + 1 if att_records and 'id_attendance' in pd.DataFrame(att_records).columns else 1
                             
                             sh_reg = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
+                            all_reg_values = sh_reg.get_all_values()
 
                             # Φιλτράρουμε MONO όσους έχουν επιλεγεί ως "ΝΑΙ"
                             rows_to_append_or_update = []
@@ -604,21 +605,23 @@ else:
                                     sh_att.append_row([next_att_id, c_id, f"{data['lname']} {data['fname']}", selected_year_att, target_date_str, "ΝΑΙ"])
                                     next_att_id += 1
 
-                                # Υπολογισμός χρέους
-                                current_att_df = pd.DataFrame(sh_att.get_all_records())
-                                user_total_nais = 0
-                                if not current_att_df.empty:
-                                    current_att_df.columns = current_att_df.columns.astype(str).str.strip()
-                                    user_total_nais = current_att_df[
-                                        (current_att_df['id_customer'].astype(str).str.strip() == c_id) &
-                                        (current_att_df['school_year'].astype(str).str.strip() == selected_year_att) &
-                                        (current_att_df['status'].astype(str).str.strip().str.upper() == 'ΝΑΙ')
-                                    ].shape[0]
+                                # Έλεγχος για Ανοιχτή Πληρωμή & Ενημέρωση Χρέους ΜΟΝΟ για Ανοιχτές Πληρωμές
+                                r_idx = data['reg_row_index']
+                                reg_row_data = all_reg_values[r_idx - 1] # 0-indexed
+                                
+                                energy_type = str(reg_row_data[10]).strip() if len(reg_row_data) > 10 else ""
+                                
+                                if energy_type.lower() == "ανοιχτή πληρωμή":
+                                    current_xreos = 0.0
+                                    try:
+                                        current_xreos = float(str(reg_row_data[11]).replace(',', '.') or 0.0)
+                                    except:
+                                        current_xreos = 0.0
 
-                                calculated_xreos = user_total_nais * data['adj_cost']
-                                sh_reg.update_cell(data['reg_row_index'], 12, calculated_xreos)
+                                    new_xreos = current_xreos + data['adj_cost']
+                                    sh_reg.update_cell(r_idx, 12, new_xreos)
 
-                            st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε επιτυχώς (καταχωρήθηκαν μόνο οι παρουσίες)!")
+                            st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε επιτυχώς (μόνο για ΝΑΙ & Ανοιχτές Πληρωμές)!")
                             time.sleep(1.2)
                             st.rerun()
                         except Exception as e:
