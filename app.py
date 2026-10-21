@@ -2032,7 +2032,7 @@ else:
             }
             display_df = display_df.rename(columns=renames)
             
-            st.dataframe(display_df[['Ημερομηνία', 'Κατηγορία', 'Περιγραφή', 'Έσοδα (+', 'Έξοδος / Ανάληψη (-)']], use_container_width=True, hide_index=True)
+            st.dataframe(display_df[['Ημερομηνία', 'Κατηγορία', 'Περιγραφή', 'Έσοδα (+)', 'Έξοδος / Ανάληψη (-)']], use_container_width=True, hide_index=True)
 
             # 4. Σύνολα στο κάτω μέρος ανάλογα με το φίλτρο
             period_inc = filtered_df['income'].sum()
