@@ -1463,28 +1463,27 @@ else:
         else:
             exp_df.columns = exp_df.columns.astype(str).str.strip()
 
-            # Ασφαλή και ακριβής ανάγνωση ποσού χωρίς καμία αλλοίωση
+            # Ασφαλή και ακριβής ανάγνωση ποσού
             if 'amount' in exp_df.columns:
                 def exact_amount(val):
                     if pd.isna(val) or str(val).strip() == '':
                         return 0.0
-                    try:
-                        # Αν είναι ήδη καθαρός αριθμός float/int από το Sheets API
-                        if isinstance(val, (int, float)):
-                            return float(val)
-                            
-                        val_str = str(val).strip().replace('€', '').strip()
+                    # Αν είναι ήδη αριθμός από το Sheets API
+                    if isinstance(val, (int, float)):
+                        return float(val)
                         
-                        # Αν υπάρχει και κόμμα και τελεία (π.χ. 1.234,56)
-                        if ',' in val_str and '.' in val_str:
-                            if val_str.rfind(',') > val_str.rfind('.'):
-                                val_str = val_str.replace('.', '').replace(',', '.')
-                            else:
-                                val_str = val_str.replace(',', '')
-                        elif ',' in val_str:
-                            # Αν υπάρχει μόνο κόμμα (π.χ. 5,2 ή 5,20)
-                            val_str = val_str.replace(',', '.')
-                            
+                    val_str = str(val).strip().replace('€', '').strip()
+                    
+                    # Αντικατάσταση κόμματος με τελεία για τα δεκαδικά
+                    if ',' in val_str and '.' in val_str:
+                        if val_str.rfind(',') > val_str.rfind('.'):
+                            val_str = val_str.replace('.', '').replace(',', '.')
+                        else:
+                            val_str = val_str.replace(',', '')
+                    elif ',' in val_str:
+                        val_str = val_str.replace(',', '.')
+                        
+                    try:
                         return float(val_str)
                     except:
                         return 0.0
