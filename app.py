@@ -438,8 +438,8 @@ else:
             </style>
         """, unsafe_allow_html=True)
 
-        st.markdown("<h1 class='main-title'>🤖 ROBOLAND DB</h1>", unsafe_allow_html=True)
-        st.markdown("<p class='sub-title'>Κεντρικό Σύστημα Διαχείρισης & Πόρων</p>", unsafe_allow_html=True)
+        st.markdown("<h1 class='main-title'>🤖 ROBOLAND DB 🤖</h1>", unsafe_allow_html=True)
+        st.markdown("<p class='sub-title'>Κεντρικό Σύστημα Διαχείρισης</p>", unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
 
         # Χρήση στηλών για οπτικό διαχωρισμό σε "Κάρτες" (Cards)
