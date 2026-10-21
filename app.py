@@ -1930,7 +1930,7 @@ else:
             st.session_state.page = "menu"
             st.rerun() 
         
-        st.subheader("📊 Ενιαία Οικονομική Επισκόπηση & Ταμείο (db_Final)")
+        st.subheader("📊 Συνολική Οικονομική Επισκόπηση")
         
         # 1. Φόρτωση δεδομένων
         pays_df = load_specific_db("db_payments")
@@ -2048,9 +2048,9 @@ else:
                 st.info(f"📌 **Άνοιγμα Ταμείου (από προηγούμενους μήνες):** `{opening_balance:,.2f} €`".replace(',', 'X').replace('.', ',').replace('X', '.'))
 
             col_s1, col_s2, col_s3 = st.columns(3)
-            col_s1.metric(label="📈 Έσοδα Μήνα", value=f"{period_inc:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
-            col_s2.metric(label="📉 Έξοδα & Αναλήψεις Μήνα", value=f"{period_exp:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
-            col_s3.metric(label="💰 Τρέχον Υπόλοιπο Ταμείου (Drawer)", value=f"{total_drawer_balance:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
+            col_s1.metric(label="📈 Έσοδα:", value=f"{period_inc:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
+            col_s2.metric(label="📉 Έξοδα - Αναλήψεις", value=f"{period_exp:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
+            col_s3.metric(label="💰 Ταμείο", value=f"{total_drawer_balance:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
     
     # --- ΣΕΛΙΔΑ: ΠΑΡΑΠΟΝΑ & ΣΧΟΛΙΑ ---
     elif st.session_state.page == "complaints_page":
