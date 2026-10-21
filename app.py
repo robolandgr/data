@@ -390,21 +390,25 @@ if not st.session_state.logged_in:
             st.error(f"Σφάλμα σύνδεσης: {e}")        
 
 # ==================== MAIN APPLICATION ====================
+
 else:
     st.sidebar.markdown(f"👤 **{st.session_state.username}** ({st.session_state.role.upper()})")
-    if st.sidebar.button("🚪 Έξοδος", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.page = "menu"
-        st.rerun()
-
-    if st.button("🔄 Ενημέρωση Δεδομένων", use_container_width=True, disabled=st.session_state.is_submitting):
+    
+    # Μεταφορά του κουμπιού ενημέρωσης στην αριστερή πλευρική στήλη (sidebar)
+    if st.sidebar.button("🔄 Ενημέρωση Δεδομένων", use_container_width=True, disabled=st.session_state.is_submitting):
         st.session_state.is_submitting = True
         load_specific_db.clear()
         st.success("Τα δεδομένα ενημερώθηκαν επιτυχώς από τη Google!")
         time.sleep(1)
         st.session_state.is_submitting = False
         st.rerun()
+
+    st.sidebar.markdown("---")
     
+    if st.sidebar.button("🚪 Έξοδος", use_container_width=True):
+        st.session_state.logged_in = False
+        st.session_state.page = "menu"
+        st.rerun()
     # 1. ΚΕΝΤΡΙΚΟ ΜΕΝΟΥ (ΜΟΝΤΕΡΝΟΣ ΣΧΕΔΙΑΣΜΟΣ)
     if st.session_state.page == "menu":
         # Custom CSS για ωραιότερα οπτικά εφέ και κάρτες
