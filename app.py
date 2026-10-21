@@ -1848,34 +1848,36 @@ else:
             if pr_regs.empty:
                 st.info("Δεν βρέθηκαν μαθητές με κατάσταση Pre-Register για τα επιλεγμένα κριτήρια.")
             else:
-                # Διασφαλίζουμε ότι κρατάμε μοναδικούς συνδυασμούς μαθητή & έτους (για αποφυγή διπλοτυπίας στην ίδια εγγραφή, 
-                # αλλά επιτρέποντας διαφορετικά σχολικά έτη)
                 pr_regs['id_customer_str'] = pr_regs['id_customer'].astype(str).str.strip()
                 cust_df['id_customer_str'] = cust_df['id_customer'].astype(str).str.strip()
                 
                 # Συνδυάζουμε τις εγγραφές pre-register με ΟΛΑ τα στοιχεία του πελάτη από το db_customers
                 merged_pr = pd.merge(pr_regs, cust_df, on='id_customer_str', how='inner', suffixes=('', '_cust'))
                 
-                # Ομαδοποίηση / καθαρισμός στηλών για να εμφανίζονται ΟΛΑ τα στοιχεία του customer καθαρά
-                # Θέλουμε να φαίνεται και το σχολικό έτος της εγγραφής
                 if not merged_pr.empty:
-                    # Επιλέγουμε να εμφανίσουμε τις στήλες του customer μαζί με το σχολικό έτος pre-register
                     customer_cols = [c for c in cust_df.columns if c != 'id_customer_str']
                     display_cols = ['school_year'] + customer_cols
                     existing_display_cols = [c for c in display_cols if c in merged_pr.columns]
                     
                     final_pr_df = merged_pr[existing_display_cols].copy()
                     
-                    # Μετονομασία βασικών στηλών για ομορφιά
+                    # Πλήρης μετονομασία όλων των στηλών στα ελληνικά
                     renames_pr = {
                         'school_year': 'Σχολικό Έτος',
+                        'id_customer': 'ID Πελάτη',
                         'customer_firstname': 'Όνομα Μαθητή',
                         'customer_lastname': 'Επώνυμο Μαθητή',
                         'parent_firstname': 'Όνομα Γονέα',
                         'parent_lastname': 'Επώνυμο Γονέα',
                         'telephone': 'Τηλέφωνο',
                         'email': 'Email',
-                        'address': 'Διεύθυνση'
+                        'address': 'Διεύθυνση',
+                        'birthday_date': 'Ημερομηνία Γέννησης',
+                        'register_date': 'Ημερομηνία Εγγραφής',
+                        'Taxis_User': 'Taxis Username',
+                        'Taxis_Pass': 'Taxis Password',
+                        'ADT': 'ΑΔΤ',
+                        'AFM': 'ΑΦΜ'
                     }
                     final_pr_df = final_pr_df.rename(columns=renames_pr)
                     
