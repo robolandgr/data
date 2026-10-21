@@ -1674,6 +1674,46 @@ else:
         else:
             st.info("Δεν βρέθηκαν εγγραφές στη βάση `db_registrations`.")
 
+        # --- ΑΝΑΛΥΤΙΚΟ ΙΣΤΟΡΙΚΟ ΣΧΟΛΙΩΝ / ΠΑΡΑΠΟΝΩΝ ΑΝΑ ΜΑΘΗΤΗ ---
+        st.markdown("---")
+        st.subheader("💬 Αναλυτικό Ιστορικό Σχολίων & Παραπόνων Μαθητή")
+        
+        if not cust_df.empty:
+            if 'customer_lastname' in cust_df.columns and 'customer_firstname' in cust_df.columns:
+                cust_sorted = cust_df.sort_values(by=['customer_lastname', 'customer_firstname'], ascending=[True, True])
+            else:
+                cust_sorted = cust_df.copy()
+                
+            cust_sorted['display_hist'] = cust_sorted['customer_lastname'].astype(str) + " " + cust_sorted['customer_firstname'].astype(str) + " (ID: " + cust_sorted['id_customer'].astype(str) + ")"
+            sel_hist_cust = st.selectbox("🔍 Επιλογή Μαθητή για Προβολή Ιστορικού Σχολίων", options=["-- Επιλέξτε --"] + cust_sorted['display_hist'].tolist(), key="hist_cust_sel")
+            
+            if sel_hist_cust != "-- Επιλέξτε --":
+                row_h = cust_sorted[cust_sorted['display_hist'] == sel_hist_cust].iloc[0]
+                h_id = str(row_h['id_customer']).strip()
+                
+                comp_all_df = load_specific_db("db_complaint")
+                if comp_all_df.empty:
+                    st.info("Δεν υπάρχουν καταχωρημένα σχόλια ή παράπονα στη βάση.")
+                else:
+                    comp_all_df.columns = comp_all_df.columns.astype(str).str.strip()
+                    student_comps = comp_all_df[comp_all_df['id_customer'].astype(str).str.strip() == h_id].copy()
+                    
+                    if student_comps.empty:
+                        st.info("Ο συγκεκριμένος μαθητής δεν έχει καμία καταχώρηση σε σχόλια ή παράπονα.")
+                    else:
+                        st.markdown(f"**Βρέθηκαν συνολικά {len(student_comps)} εγγραφές (Ανοιχτά & Κλειστά):**")
+                        
+                        renames_h = {
+                            'complaint_date': 'Ημερομηνία',
+                            'choice': 'Τύπος',
+                            'complaint_subject': 'Θέμα',
+                            'complaint_text': 'Κείμενο',
+                            'complaint_staff': 'Υπεύθυνος',
+                            'status': 'Κατάσταση'
+                        }
+                        display_comp_df = student_comps.drop(columns=[c for c in ['id_complaint', 'id_customer', 'customer_firstname', 'customer_lastname'] if c in student_comps.columns]).rename(columns=renames_h)
+                        st.dataframe(display_comp_df, use_container_width=True, hide_index=True)
+
     # --- ΣΕΛΙΔΑ: ΚΑΤΑΧΩΡΗΣΗ ΕΤΑΙΡΕΙΩΝ / ΠΡΟΜΗΘΕΥΤΩΝ ---
     elif st.session_state.page == "corp_suppliers_page":
         if st.button("⬅️ Μενού", use_container_width=True): 
