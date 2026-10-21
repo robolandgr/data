@@ -1409,6 +1409,7 @@ else:
                 inv_date = st.date_input("Ημερομηνία Παραστατικού", value=datetime.today())
                 pay_date = st.date_input("Ημερομηνία Πληρωμής", value=datetime.today())
                 amt = st.number_input("Ποσό (€)", min_value=0.0, format="%.2f")
+                amount_to_save = float(amt)
                 pay_method = st.selectbox("Τρόπος Πληρωμής", options=["Μετρητά", "Κατάθεση", "POS"])
 
                 if st.form_submit_button("💾 Αποθήκευση Εξόδου"):
@@ -1420,7 +1421,7 @@ else:
                             sh = gc.open(OLD_SHEET_NAME).add_worksheet(title="db_payments_company", rows="1000", cols="12")
                             sh.append_row([
                                 "id", "invoice_number", "type", "customer_id", "company_name", 
-                                "school_year", "invoice_date", "payment_date", "entry_date", "amount", "pay_method"
+                                "school_year", "invoice_date", "payment_date", "entry_date", "amount_to_save", "pay_method"
                             ])
 
                         recs = sh.get_all_records()
@@ -1454,6 +1455,7 @@ else:
         try:
             gc = get_gspread_client()
             worksheet = gc.open(OLD_SHEET_NAME).worksheet("db_payments_company")
+            # Χρησιμοποιούμε value_render_option='UNFORMATTED_VALUE' αν υποστηρίζεται ή απλά get_all_records()
             exp_df = pd.DataFrame(worksheet.get_all_records())
         except:
             exp_df = pd.DataFrame()
@@ -1463,28 +1465,24 @@ else:
         else:
             exp_df.columns = exp_df.columns.astype(str).str.strip()
 
-            # Ασφαλή και ακριβής ανάγνωση ποσού
+            # Απόλυτα ασφαλής μετατροπή ποσού χωρίς λάθη δεκαδικών
             if 'amount' in exp_df.columns:
                 def exact_amount(val):
                     if pd.isna(val) or str(val).strip() == '':
                         return 0.0
-                    # Αν είναι ήδη αριθμός από το Sheets API
+                    
+                    # Αν έρθε απευθείας σαν αριθμός από το Google Sheets
                     if isinstance(val, (int, float)):
                         return float(val)
                         
                     val_str = str(val).strip().replace('€', '').strip()
                     
-                    # Αντικατάσταση κόμματος με τελεία για τα δεκαδικά
-                    if ',' in val_str and '.' in val_str:
-                        if val_str.rfind(',') > val_str.rfind('.'):
-                            val_str = val_str.replace('.', '').replace(',', '.')
-                        else:
-                            val_str = val_str.replace(',', '')
-                    elif ',' in val_str:
-                        val_str = val_str.replace(',', '.')
-                        
+                    # Αντικατάσταση κόμματος με τελεία
+                    val_str = val_str.replace(',', '.')
+                    
                     try:
-                        return float(val_str)
+                        res = float(val_str)
+                        return res
                     except:
                         return 0.0
 
@@ -1510,7 +1508,7 @@ else:
             else:
                 display_exp_df = filtered_exp.copy()
                 if 'amount_numeric' in display_exp_df.columns:
-                    # Μορφοποίηση στήλης ποσού για ομορφιά στο grid (π.χ. 5,20 €)
+                    # Εμφάνιση με κόμμα στα δεκαδικά (π.χ. 5,20 €)
                     display_exp_df['amount'] = display_exp_df['amount_numeric'].apply(lambda x: f"{x:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
                     drop_cols = [c for c in ['amount_numeric'] if c in display_exp_df.columns]
                     display_exp_df = display_exp_df.drop(columns=drop_cols)
