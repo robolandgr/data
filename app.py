@@ -80,6 +80,23 @@ def uppercase_clean(val):
         s = s.replace(t, letter)
     return s
 
+def safe_float_conversion(val):
+    if pd.isna(val):
+        return 0.0
+    s = str(val).strip()
+    # Αν το string περιέχει κόμμα (π.χ. "5,2" ή "5,20"), το μετατρέπουμε σε τελεία για σωστό float
+    if ',' in s and '.' not in s:
+        s = s.replace(',', '.')
+    elif ',' in s and '.' in s:
+        if s.rfind(',') > s.rfind('.'):
+            s = s.replace('.', '').replace(',', '.')
+        else:
+            s = s.replace(',', '')
+    try:
+        return float(s)
+    except:
+        return 0.0
+
 def remove_accents(input_str):
     if not isinstance(input_str, str): return str(input_str)
     nfkd_form = unicodedata.normalize('NFKD', input_str)
@@ -1436,9 +1453,7 @@ else:
         
         try:
             gc = get_gspread_client()
-            # Ζητάμε τα δεδομένα ως raw/strings αν χρειάζεται, ή απλά τα διαβάζουμε:
             worksheet = gc.open(OLD_SHEET_NAME).worksheet("db_payments_company")
-            # Χρησιμοποιούμε value_render_option='UNFORMATTED_VALUE' ή απλά παίρνουμε τα records
             exp_df = pd.DataFrame(worksheet.get_all_records())
         except:
             exp_df = pd.DataFrame()
@@ -1448,19 +1463,28 @@ else:
         else:
             exp_df.columns = exp_df.columns.astype(str).str.strip()
 
-            # Ασφαλής και ακριβής ανάγνωση ποσού ΧΩΡΙΣ καμία διαίρεση
+            # Ασφαλή και ακριβής ανάγνωση ποσού χωρίς καμία αλλοίωση
             if 'amount' in exp_df.columns:
                 def exact_amount(val):
                     if pd.isna(val) or str(val).strip() == '':
                         return 0.0
                     try:
-                        # Μετατροπή σε string για να διαβάσουμε την ακριβή τιμή
+                        # Αν είναι ήδη καθαρός αριθμός float/int από το Sheets API
+                        if isinstance(val, (int, float)):
+                            return float(val)
+                            
                         val_str = str(val).strip().replace('€', '').strip()
                         
-                        # Αν η Google Sheets το έστειλε ως float χωρίς διαχωριστικό επειδή έτσι το διάβασε το API,
-                        # το καθαρίζουμε. Αν έχει κόμμα, το κάνουμε τελεία.
-                        val_str = val_str.replace(',', '.')
-                        
+                        # Αν υπάρχει και κόμμα και τελεία (π.χ. 1.234,56)
+                        if ',' in val_str and '.' in val_str:
+                            if val_str.rfind(',') > val_str.rfind('.'):
+                                val_str = val_str.replace('.', '').replace(',', '.')
+                            else:
+                                val_str = val_str.replace(',', '')
+                        elif ',' in val_str:
+                            # Αν υπάρχει μόνο κόμμα (π.χ. 5,2 ή 5,20)
+                            val_str = val_str.replace(',', '.')
+                            
                         return float(val_str)
                     except:
                         return 0.0
@@ -1487,6 +1511,7 @@ else:
             else:
                 display_exp_df = filtered_exp.copy()
                 if 'amount_numeric' in display_exp_df.columns:
+                    # Μορφοποίηση στήλης ποσού για ομορφιά στο grid (π.χ. 5,20 €)
                     display_exp_df['amount'] = display_exp_df['amount_numeric'].apply(lambda x: f"{x:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
                     drop_cols = [c for c in ['amount_numeric'] if c in display_exp_df.columns]
                     display_exp_df = display_exp_df.drop(columns=drop_cols)
@@ -1495,7 +1520,8 @@ else:
 
                 if 'amount_numeric' in filtered_exp.columns:
                     total_exp_amt = filtered_exp['amount_numeric'].sum()
-                    st.markdown(f"### 💰 **Συνολικό Ποσό Εξόδων:** `{total_exp_amt:,.2f} €`".replace(',', 'X').replace('.', ',').replace('X', '.'))
+                    formatted_total = f"{total_exp_amt:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.')
+                    st.markdown(f"### 💰 **Συνολικό Ποσό Εξόδων:** `{formatted_total}`")
                     
     # --- ΣΕΛΙΔΑ: ΠΡΟΓΡΑΜΜΑΤΑ & ΤΜΗΜΑΤΑ ---
     elif st.session_state.page == "add_structure":
