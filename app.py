@@ -881,7 +881,7 @@ else:
                                 sh_cust.update_cell(r_idx, 14, afm_val.strip())
                                 
                                 st.success("✅ Τα στοιχεία του πελάτη ενημερώθηκαν επιτυχώς!")
-                                time.sleep(1.2)
+                                time.sleep(1.3)
                                 st.rerun()
                         except Exception as e:
                             st.error(f"Σφάλμα ενημέρωσης: {e}")
