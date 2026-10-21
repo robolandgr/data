@@ -509,7 +509,18 @@ else:
                 if st.button("🛠️ Μετάβαση", use_container_width=True, key="btn_complaints"):
                     st.session_state.page = "complaints_page"
                     st.rerun()
-    
+        
+        # Ξεχωριστό τμήμα για τους Pre-Register μαθητές στο κάτω μέρος
+        with st.container(border=True):
+            col_pr_ex1, col_pr_ex2 = st.columns([3, 1])
+            with col_pr_ex1:
+                st.markdown("##### 📝 Διαχείριση Pre-Register Μαθητών")
+                st.write("Προβολή και παρακολούθηση μαθητών σε κατάσταση προεγγραφής ανά σχολικό έτος.")
+            with col_pr_ex2:
+                st.write("")
+                if st.button("🛠️ Μετάβαση", use_container_width=True, key="btn_prereg_bottom"):
+                    st.session_state.page = "pre_register_page"
+                    st.rerun()
  #----------------------------------------------------------------------   
     # --- ΣΕΛΙΔΑ: ΠΑΡΟΥΣΙΟΛΟΓΙΟ (ΤΜΗΜΑ: ΙΔΙΩΤΙΚΑ) ---
     elif st.session_state.page == "attendances_page":
@@ -1807,15 +1818,71 @@ else:
         except:
             st.info("Δεν βρέθηκε το tab db_customers_company ή είναι κενό.")
 
-    # --- ΣΕΛΙΔΑ: ΑΝΕΝΤΑΧΤΟΙ ΠΕΛΑΤΕΣ ---
-    elif st.session_state.page == "unassigned_customers":
+    # --- ΣΕΛΙΔΑ: PRE-REGISTER ---
+    elif st.session_state.page == "pre_register_page":
         if st.button("⬅️ Μενού", use_container_width=True): 
             st.session_state.page = "menu"
-            st.rerun()
-        st.subheader("Ανένταχτοι Πελάτες")
-        cust = load_specific_db("db_customers")
-        if not cust.empty: 
-            st.dataframe(cust, use_container_width=True)
+            st.rerun() 
+        
+        st.subheader("📝 Μαθητές σε Κατάσταση Pre-Register")
+        
+        reg_df = load_specific_db("db_registrations")
+        cust_df = load_specific_db("db_customers")
+        
+        if reg_df.empty or cust_df.empty:
+            st.info("Δεν βρέθηκαν δεδομένα εγγραφών ή πελατών.")
+        else:
+            reg_df.columns = reg_df.columns.astype(str).str.strip()
+            cust_df.columns = cust_df.columns.astype(str).str.strip()
+            
+            # Φίλτρο Σχολικού Έτους
+            available_years = ["ΟΛΑ"] + sorted(reg_df['school_year'].dropna().astype(str).unique().tolist(), reverse=True)
+            sel_pr_year = st.selectbox("📅 Φίλτρο ανά Σχολικό Έτος", options=available_years, key="pr_year_filter")
+            
+            # Φιλτράρισμα των εγγραφών που έχουν class "Pre-Register" (ανεξαρτήτως πεζών/κεφαλαίων)
+            pr_regs = reg_df[reg_df['class'].astype(str).str.strip().str.lower() == 'pre-register'].copy()
+            
+            if sel_pr_year != "ΟΛΑ":
+                pr_regs = pr_regs[pr_regs['school_year'].astype(str).str.strip() == sel_pr_year]
+                
+            if pr_regs.empty:
+                st.info("Δεν βρέθηκαν μαθητές με κατάσταση Pre-Register για τα επιλεγμένα κριτήρια.")
+            else:
+                # Διασφαλίζουμε ότι κρατάμε μοναδικούς συνδυασμούς μαθητή & έτους (για αποφυγή διπλοτυπίας στην ίδια εγγραφή, 
+                # αλλά επιτρέποντας διαφορετικά σχολικά έτη)
+                pr_regs['id_customer_str'] = pr_regs['id_customer'].astype(str).str.strip()
+                cust_df['id_customer_str'] = cust_df['id_customer'].astype(str).str.strip()
+                
+                # Συνδυάζουμε τις εγγραφές pre-register με ΟΛΑ τα στοιχεία του πελάτη από το db_customers
+                merged_pr = pd.merge(pr_regs, cust_df, on='id_customer_str', how='inner', suffixes=('', '_cust'))
+                
+                # Ομαδοποίηση / καθαρισμός στηλών για να εμφανίζονται ΟΛΑ τα στοιχεία του customer καθαρά
+                # Θέλουμε να φαίνεται και το σχολικό έτος της εγγραφής
+                if not merged_pr.empty:
+                    # Επιλέγουμε να εμφανίσουμε τις στήλες του customer μαζί με το σχολικό έτος pre-register
+                    customer_cols = [c for c in cust_df.columns if c != 'id_customer_str']
+                    display_cols = ['school_year'] + customer_cols
+                    existing_display_cols = [c for c in display_cols if c in merged_pr.columns]
+                    
+                    final_pr_df = merged_pr[existing_display_cols].copy()
+                    
+                    # Μετονομασία βασικών στηλών για ομορφιά
+                    renames_pr = {
+                        'school_year': 'Σχολικό Έτος',
+                        'customer_firstname': 'Όνομα Μαθητή',
+                        'customer_lastname': 'Επώνυμο Μαθητή',
+                        'parent_firstname': 'Όνομα Γονέα',
+                        'parent_lastname': 'Επώνυμο Γονέα',
+                        'telephone': 'Τηλέφωνο',
+                        'email': 'Email',
+                        'address': 'Διεύθυνση'
+                    }
+                    final_pr_df = final_pr_df.rename(columns=renames_pr)
+                    
+                    st.markdown(f"**Βρέθηκαν εγγραφές Pre-Register:** {len(final_pr_df)}")
+                    st.dataframe(final_pr_df, use_container_width=True, hide_index=True)
+                else:
+                    st.info("Δεν βρέθηκαν αντιστοιχίσεις πελατών.")
 
     # --- ΣΕΛΙΔΑ: ΠΑΡΑΠΟΝΑ & ΣΧΟΛΙΑ ---
     elif st.session_state.page == "complaints_page":
