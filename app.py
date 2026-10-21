@@ -668,27 +668,46 @@ else:
                 prog_list = progs_df['program_name'].tolist() if not progs_df.empty else []
                 s_prog = st.selectbox("📚 Πρόγραμμα", options=prog_list)
                 
-                default_cost = float(str(reg_to_edit.get('adjusted_cost', 0)).replace(',', '.') or 0) if reg_to_edit is not None else 0.0
-                adj_cost = st.number_input("💰 Συμφωνηθέν Ποσό (€)", value=default_cost, step=10.0)
-                
+                # --- ΕΠΙΛΟΓΗ ΤΜΗΜΑΤΟΣ (ΜΠΑΙΝΕΙ ΠΡΙΝ ΤΑ ΥΠΟΛΟΙΠΑ ΓΙΑ ΝΑ ΕΛΕΓΧΕΙ ΤΗΝ ΕΜΦΑΝΙΣΗ) ---
                 class_options = ["Xωρίς Τμήμα"] + (classes_df['class_name'].unique().tolist() if not classes_df.empty else [])
-                sel_class = st.selectbox("🏫 Τμήμα", options=class_options)
                 
-                energy_options = ["Ανοιχτή πληρωμή", "Κλειστή πληρωμή"]
-                def_energy_idx = 0
-                if reg_to_edit is not None and 'energy' in reg_to_edit:
-                    val_en = str(reg_to_edit['energy']).strip()
-                    if val_en in energy_options:
-                        def_energy_idx = energy_options.index(val_en)
-                sel_energy = st.selectbox("💡 Τύπος Πληρωμής", options=energy_options, index=def_energy_idx)
+                default_class_idx = 0
+                if reg_to_edit is not None and 'class' in reg_to_edit:
+                    cur_cls = str(reg_to_edit['class']).strip()
+                    if cur_cls in class_options:
+                        default_class_idx = class_options.index(cur_cls)
+                        
+                sel_class = st.selectbox("🏫 Τμήμα", options=class_options, index=default_class_idx)
                 
-                bardia_options = ["Α Βάρδια", "Β Βάρδια"]
-                def_bardia_idx = 0
-                if reg_to_edit is not None and 'm_bardia' in reg_to_edit:
-                    val_bar = str(reg_to_edit['m_bardia']).strip()
-                    if val_bar in bardia_options:
-                        def_bardia_idx = bardia_options.index(val_bar)
-                sel_bardia = st.selectbox("🕒 Επιλογή Βάρδιας", options=bardia_options, index=def_bardia_idx)
+                # Έλεγχος τύπου τμήματος (Voucher ή Ιδιωτικά)
+                is_voucher = "voucher" in sel_class.lower()
+                is_private = "ιδιωτικά" in sel_class.lower() or "ιδιωτικα" in sel_class.lower()
+
+                # --- ΕΜΦΑΝΙΣΗ ΒΑΡΔΙΑΣ (ΜΟΝΟ ΑΝ ΕΠΙΛΕΓΕΙ VOUCHER) ---
+                sel_bardia = ""
+                if is_voucher:
+                    bardia_options = ["Α Βάρδια", "Β Βάρδια"]
+                    def_bardia_idx = 0
+                    if reg_to_edit is not None and 'm_bardia' in reg_to_edit:
+                        val_bar = str(reg_to_edit['m_bardia']).strip()
+                        if val_bar in bardia_options:
+                            def_bardia_idx = bardia_options.index(val_bar)
+                    sel_bardia = st.selectbox("🕒 Επιλογή Βάρδιας", options=bardia_options, index=def_bardia_idx)
+
+                # --- ΕΜΦΑΝΙΣΗ ΣΥΜΦΩΝΗΘΕΝΤΟΣ & ΤΥΠΟΥ ΠΛΗΡΩΜΗΣ (ΜΟΝΟ ΑΝ ΕΠΙΛΕΓΕΙ ΙΔΙΩΤΙΚΑ) ---
+                adj_cost = 0.0
+                sel_energy = ""
+                if is_private:
+                    default_cost = float(str(reg_to_edit.get('adjusted_cost', 0)).replace(',', '.') or 0) if reg_to_edit is not None else 0.0
+                    adj_cost = st.number_input("💰 Συμφωνηθέν Ποσό (€)", value=default_cost, step=10.0)
+                    
+                    energy_options = ["Ανοιχτή πληρωμή", "Κλειστή πληρωμή"]
+                    def_energy_idx = 0
+                    if reg_to_edit is not None and 'energy' in reg_to_edit:
+                        val_en = str(reg_to_edit['energy']).strip()
+                        if val_en in energy_options:
+                            def_energy_idx = energy_options.index(val_en)
+                    sel_energy = st.selectbox("💡 Τύπος Πληρωμής", options=energy_options, index=def_energy_idx)
 
                 default_start_date = datetime.today()
                 if reg_to_edit is not None and 'start_date' in reg_to_edit:
