@@ -448,7 +448,7 @@ else:
         # --- ΚΑΡΤΑ 1: ΔΙΑΧΕΙΡΙΣΗ ΠΕΛΑΤΩΝ ---
         with col_m1:
             with st.container(border=True):
-                st.markdown("<div class='card-header'>👥 Πελάτες & Μαθητές</div>", unsafe_allow_html=True)
+                st.markdown("<div class='card-header'>👥 Μαθητές</div>", unsafe_allow_html=True)
                 if st.button("➕ Νέος Πελάτης", use_container_width=True, key="btn_reg"):
                     st.session_state.page = "register"
                     st.rerun()
