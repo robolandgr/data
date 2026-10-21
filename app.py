@@ -405,77 +405,108 @@ else:
         st.session_state.is_submitting = False
         st.rerun()
     
-    # 1. ΚΕΝΤΡΙΚΟ ΜΕΝΟΥ
+    # 1. ΚΕΝΤΡΙΚΟ ΜΕΝΟΥ (ΜΟΝΤΕΡΝΟΣ ΣΧΕΔΙΑΣΜΟΣ)
     if st.session_state.page == "menu":
-        st.markdown("<h1 style='text-align: center;'>🤖 ROBOLAND DB</h1>", unsafe_allow_html=True)
-        st.markdown("<h2 style='text-align: center;'>Κεντρικό Μενού Διαχείρισης</h2>", unsafe_allow_html=True)
+        # Custom CSS για ωραιότερα οπτικά εφέ και κάρτες
+        st.markdown("""
+            <style>
+                .main-title {
+                    text-align: center;
+                    font-size: 2.8rem;
+                    font-weight: 800;
+                    color: #1E3A8A;
+                    margin-bottom: 0px;
+                }
+                .sub-title {
+                    text-align: center;
+                    font-size: 1.2rem;
+                    color: #6B7280;
+                    margin-bottom: 30px;
+                }
+                .card-header {
+                    font-size: 1.1rem;
+                    font-weight: 700;
+                    color: #374151;
+                    margin-bottom: 10px;
+                    border-bottom: 2px solid #E5E7EB;
+                    padding-bottom: 5px;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+
+        st.markdown("<h1 class='main-title'>🤖 ROBOLAND DB</h1>", unsafe_allow_html=True)
+        st.markdown("<p class='sub-title'>Κεντρικό Σύστημα Διαχείρισης & Πόρων</p>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Χρήση στηλών για οπτικό διαχωρισμό σε "Κάρτες" (Cards)
+        col_m1, col_m2, col_m3 = st.columns(3, gap="medium")
+
+        # --- ΚΑΡΤΑ 1: ΔΙΑΧΕΙΡΙΣΗ ΠΕΛΑΤΩΝ ---
+        with col_m1:
+            with st.container(border=True):
+                st.markdown("<div class='card-header'>👥 Πελάτες & Μαθητές</div>", unsafe_allow_html=True)
+                if st.button("➕ Νέος Πελάτης", use_container_width=True, key="btn_reg"):
+                    st.session_state.page = "register"
+                    st.rerun()
+                if st.button("📋 Επεξεργασία Στοιχείων", use_container_width=True, key="btn_cust_reg"):
+                    st.session_state.page = "customer_registry"
+                    st.rerun()
+                if st.button("🔄 Εισαγωγή σε Τμήμα", use_container_width=True, key="btn_renew"):
+                    st.session_state.page = "renew_registration"
+                    st.rerun()
+                if st.button("🛑 Διαχείριση STOP/Κατάστασης", use_container_width=True, key="btn_view_cust"):
+                    st.session_state.page = "view_customers"
+                    st.rerun()
+
+        # --- ΚΑΡΤΑ 2: ΠΑΡΟΥΣΙΟΛΟΓΙΟ & ΟΙΚΟΝΟΜΙΚΑ ---
+        with col_m2:
+            with st.container(border=True):
+                st.markdown("<div class='card-header'>💳 Λειτουργία & Ταμεία</div>", unsafe_allow_html=True)
+                if st.button("✅ Παρουσιολόγιο (Ιδιωτικά)", use_container_width=True, key="btn_att"):
+                    st.session_state.page = "attendances_page"
+                    st.rerun()
+                if st.button("💵 Καταχώρηση Συνδρομής", use_container_width=True, key="btn_pay"):
+                    st.session_state.page = "add_payment"
+                    st.rerun()
+                if st.button("📊 Ιστορικό Πληρωμών", use_container_width=True, key="btn_hist_rep"):
+                    st.session_state.page = "payment_history_report"
+                    st.rerun()
+                if st.button("📚 Διαχείριση Τμημάτων", use_container_width=True, key="btn_struct"):
+                    st.session_state.page = "add_structure"
+                    st.rerun()
+
+        # --- ΚΑΡΤΑ 3: ΕΞΟΔΑ, ΕΤΑΙΡΕΙΕΣ & ΑΝΑΦΟΡΕΣ ---
+        with col_m3:
+            with st.container(border=True):
+                st.markdown("<div class='card-header'>🏢 Επιχείρηση & Αναφορές</div>", unsafe_allow_html=True)
+                if st.button("🏢 Προμηθευτές / Εταιρείες", use_container_width=True, key="btn_suppliers"):
+                    st.session_state.page = "corp_suppliers_page"
+                    st.rerun()
+                if st.button("💸 Καταχώρηση Εξόδων", use_container_width=True, key="btn_corp_pay"):
+                    st.session_state.page = "corp_payments"
+                    st.rerun()
+                if st.button("📊 Προβολή & Φίλτρα Εξόδων", use_container_width=True, key="btn_corp_rep"):
+                    st.session_state.page = "corp_payments_report"
+                    st.rerun()
+                if st.button("📋 Μητρώο Πελατών", use_container_width=True, key="btn_anafora"):
+                    st.session_state.page = "anafora_pelaton"
+                    st.rerun()
+
         st.markdown("<br>", unsafe_allow_html=True)
         
-        st.subheader("Διαχείριση")
-        col_c1, col_c2 = st.columns(2)
-        with col_c1:
-            if st.button("➕ Νέος Πελάτης (Πρώτη Εγγραφή)", use_container_width=True):
-                st.session_state.page = "register"
-                st.rerun()
-            if st.button("📋 Επεξεργασία Στοιχείων Πελατών", use_container_width=True):
-                st.session_state.page = "customer_registry"
-                st.rerun()
-        with col_c2:
-            if st.button("👥 Διαχείριση Κατάστασης Πελατών", use_container_width=True):
-                st.session_state.page = "view_customers"
-                st.rerun()
-            if st.button("🔄 Εισαγωγή Πελάτη σε Τμήμα", use_container_width=True):
-                st.session_state.page = "renew_registration"
-                st.rerun()
-
-        st.markdown("---")
-        st.subheader("Παρουσιολόγιο & Πληρωμές")
-        col_pr1, col_pr2 = st.columns(2)
-        with col_pr1:
-            if st.button("✅ Παρουσιολόγιο", use_container_width=True):
-                st.session_state.page = "attendances_page"
-                st.rerun()
-        with col_pr2:
-            if st.button("💳 Καταχώρηση Πληρωμής", use_container_width=True):
-                st.session_state.page = "add_payment"
-                st.rerun()
-
-        st.markdown("---")
-        st.subheader("Οικονομικά")
-        col_p1, col_p2 = st.columns(2)
-        with col_p1:
-            if st.button("📊 Ιστορικό Πληρωμών ", use_container_width=True):
-                st.session_state.page = "payment_history_report"
-                st.rerun()
-            if st.button("🏢 Καταχώρηση Εταιρειών / Προμηθευτών", use_container_width=True):
-                st.session_state.page = "corp_suppliers_page"
-                st.rerun()
-        with col_p2:
-            if st.button("💸 Καταχώρηση Εξόδων", use_container_width=True):
-                st.session_state.page = "corp_payments"
-                st.rerun()
-            if st.button("📊 Ιστορικό Εξόδων", use_container_width=True):
-                st.session_state.page = "corp_payments_report"
-                st.rerun()
-
-        st.markdown("---")
-        st.subheader("Διαχείριση")
-        if st.button("📚 Τμήματα", use_container_width=True):
-            st.session_state.page = "add_structure"
-            st.rerun()
-
-        st.markdown("---")
-        st.subheader("Αναφορές")
-        if st.button("📋 Μητρώο Πελατών", use_container_width=True):
-            st.session_state.page = "anafora_pelaton"
-            st.rerun()
-
-        st.markdown("---")
-        st.markdown("##### 🔗 Διαχείριση Παραπόνων & Σχολίων")
-        if st.button("🛠️ Εισαγωγή/ Τροποποίηση Παραπόνων & Σχολίων", use_container_width=True):
-            st.session_state.page = "complaints_page"
-            st.rerun()
-
+        # Μικρότερο ξεχωριστό τμήμα για τα παράπονα/σχόλια στο κάτω μέρος
+        with st.container(border=True):
+            col_ex1, col_ex2 = st.columns([3, 1])
+            with col_ex1:
+                st.markdown("##### 🔗 Διαχείριση Παραπόνων & Σχολίων")
+                st.write("Καταγραφή και παρακολούθηση σχολίων, παραπόνων ή παρατηρήσεων πελατών.")
+            with col_ex2:
+                st.write("")
+                if st.button("🛠️ Μετάβαση", use_container_width=True, key="btn_complaints"):
+                    st.session_state.page = "complaints_page"
+                    st.rerun()
+    
+ #----------------------------------------------------------------------   
     # --- ΣΕΛΙΔΑ: ΠΑΡΟΥΣΙΟΛΟΓΙΟ (ΤΜΗΜΑ: ΙΔΙΩΤΙΚΑ) ---
     elif st.session_state.page == "attendances_page":
         if st.button("⬅️ Μενού", use_container_width=True): 
