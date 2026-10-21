@@ -1932,7 +1932,7 @@ else:
         
         st.subheader("📊 Ενιαία Οικονομική Επισκόπηση & Ταμείο (db_Final)")
         
-        # 1. Φόρτωση δεδομένων από db_payments (Έσοδα) και db_payments_company (Έξοδα / Ταμείο)
+        # 1. Φόρτωση δεδομένων
         pays_df = load_specific_db("db_payments")
         try:
             gc = get_gspread_client()
@@ -1947,11 +1947,9 @@ else:
             pays_df.columns = pays_df.columns.astype(str).str.strip()
             for _, r in pays_df.iterrows():
                 p_date = str(r.get('payment_date', '')).strip()
-                # Καθαρισμός ποσού
                 raw_amt = str(r.get('amount_paid', 0)).replace('€', '').replace(',', '.').strip()
                 try: amt = float(raw_amt)
                 except: amt = 0.0
-                
                 cust_name = f"{r.get('customer_lastname', '')} {r.get('customer_firstname', '')}".strip()
                 
                 if p_date and amt > 0:
@@ -1959,12 +1957,13 @@ else:
                         'date': p_date,
                         'month_year': p_date[:7] if len(p_date) >= 7 else 'Άγνωστο',
                         'type': 'Έσοδο',
-                        'description': f"Πληρωμή συνδρομής: {cust_name} (Απόδ: {r.get('receipt_number', '')})",
+                        'description': f"Πληρωμή συνδρομής: {cust_name}",
                         'income': amt,
-                        'expense': 0.0
+                        'expense': 0.0,
+                        'is_cash_draw': False
                     })
 
-        # Επεξεργασία Εξόδων & Ταμείου (db_payments_company)
+        # Επεξεργασία Εξόδων & Ταμείου
         expense_records = []
         if not exp_df.empty:
             exp_df.columns = exp_df.columns.astype(str).str.strip()
@@ -1973,44 +1972,52 @@ else:
                 raw_amt = str(r.get('amount', 0)).replace('€', '').replace(',', '.').strip()
                 try: amt = float(raw_amt)
                 except: amt = 0.0
-                
-                comp_name = str(r.get('company_name', '')).strip() # Εδώ μπορεί να είναι προμηθευτής ή "ΤΑΜΕΙΟ"
+                comp_name = str(r.get('company_name', '')).strip()
                 exp_type_col = str(r.get('type', 'Έξοδα')).strip()
                 
                 if e_date and amt > 0:
-                    # Αν ο προμηθευτής είναι "ΤΑΜΕΙΟ", το χαρακτηρίζουμε ως Ανάληψη/Κλείσιμο Ταμείου
                     is_cash_draw = ("ΤΑΜΕΙΟ" in comp_name.upper())
-                    desc_prefix = "Ανάληψη Ταμείου" if is_cash_draw else "Έξοδος Επιχείρησης"
                     
                     expense_records.append({
                         'date': e_date,
                         'month_year': e_date[:7] if len(e_date) >= 7 else 'Άγνωστο',
-                        'type': f"Έξοδος ({comp_name})" if not is_cash_draw else "Ανάληψη / Κλείσιμο Ταμείου",
-                        'description': f"{desc_prefix}: {comp_name} ({exp_type_col})",
+                        'type': "Ανάληψη / Κλείσιμο Ταμείου" if is_cash_draw else f"Έξοδος ({comp_name})",
+                        'description': f"Ανάληψη Ταμείου: {comp_name}" if is_cash_draw else f"Έξοδος Επιχείρησης: {comp_name}",
                         'income': 0.0,
-                        'expense': amt
+                        'expense': amt,
+                        'is_cash_draw': is_cash_draw
                     })
 
-        # Συνένωση όλων σε ένα ενιαίο DataFrame
         all_records = income_records + expense_records
         if not all_records:
-            st.info("Δεν βρέθηκαν οικονομικές κινήσεις ούτε στα έσοδα ούτε στα έξοδα.")
+            st.info("Δεν βρέθηκαν οικονομικές κινήσεις.")
         else:
             unified_df = pd.DataFrame(all_records)
-            unified_df = unified_df.sort_values(by='date', ascending=False)
+            unified_df = unified_df.sort_values(by='date', ascending=True) # Ταξινόμηση χρονολογικά για σωστό υπολοιποποιητή
+
+            # Υπολογισμός συνολικού ταμείου χρονολογικά (Running Balance)
+            unified_df['net'] = unified_df['income'] - unified_df['expense']
+            unified_df['running_drawer'] = unified_df['net'].cumsum()
 
             # 2. Φίλτρο Αναζήτησης ανά Μήνα
             available_months = ["ΟΛΑ"] + sorted(unified_df['month_year'].unique().tolist(), reverse=True)
             sel_month = st.selectbox("📅 Φίλτρο ανά Μήνα (YYYY-MM)", options=available_months)
 
+            # Υπολογισμός μεταφοράς υπολοίπου από προηγούμενους μήνες (Carry Forward)
             filtered_df = unified_df.copy()
+            opening_balance = 0.0
+            
             if sel_month != "ΟΛΑ":
-                filtered_df = filtered_df[filtered_df['month_year'] == sel_month]
+                # Υπολογίζουμε τι υπήρχε στο ταμείο πριν από αυτόν τον μήνα
+                prior_df = unified_df[unified_df['month_year'] < sel_month]
+                if not prior_df.empty:
+                    opening_balance = prior_df['net'].sum()
+                
+                filtered_df = unified_df[unified_df['month_year'] == sel_month]
 
             # 3. Εμφάνιση Grid
-            st.markdown(f"**Συνολικές Κινήσεις:** {len(filtered_df)}")
+            st.markdown(f"**Συνολικές Κινήσεις περιόδου:** {len(filtered_df)}")
             
-            # Μορφοποίηση στηλών για την εμφάνιση
             display_df = filtered_df.copy()
             display_df['income'] = display_df['income'].apply(lambda x: f"{x:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
             display_df['expense'] = display_df['expense'].apply(lambda x: f"{x:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
@@ -2025,19 +2032,25 @@ else:
             }
             display_df = display_df.rename(columns=renames)
             
-            st.dataframe(display_df[['Ημερομηνία', 'Κατηγορία', 'Περιγραφή', 'Έσοδα (+)', 'Έξοδος / Ανάληψη (-)']], use_container_width=True, hide_index=True)
+            st.dataframe(display_df[['Ημερομηνία', 'Κατηγορία', 'Περιγραφή', 'Έσοδα (+', 'Έξοδος / Ανάληψη (-)']], use_container_width=True, hide_index=True)
 
-            # 4. Σύνολα στο κάτω μέρος
-            total_inc = filtered_df['income'].sum()
-            total_exp = filtered_df['expense'].sum()
-            drawer_balance = total_inc - total_exp # Το τρέχον ταμείο μετά τις αναλήψεις-έξοδα
+            # 4. Σύνολα στο κάτω μέρος ανάλογα με το φίλτρο
+            period_inc = filtered_df['income'].sum()
+            period_exp = filtered_df['expense'].sum()
+            period_net = period_inc - period_exp
+            
+            # Τελικό ταμείο περιλαμβάνει και το άνοιγμα (opening balance) αν επιλεχθεί συγκεκριμένος μήνας
+            total_drawer_balance = opening_balance + period_net if sel_month != "ΟΛΑ" else unified_df['running_drawer'].iloc[-1] if not unified_df.empty else 0.0
 
             st.divider()
+            
+            if sel_month != "ΟΛΑ":
+                st.info(f"📌 **Άνοιγμα Ταμείου (από προηγούμενους μήνες):** `{opening_balance:,.2f} €`".replace(',', 'X').replace('.', ',').replace('X', '.'))
+
             col_s1, col_s2, col_s3 = st.columns(3)
-            col_s1.metric(label="📈 Συνολικά Έσοδα", value=f"{total_inc:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
-            col_s2.metric(label="📉 Συνολικά Έξοδα & Αναλήψεις", value=f"{total_exp:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
-            col_s3.metric(label="💰 Υπόλοιπο Ταμείου (Drawer)", value=f"{drawer_balance:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    
+            col_s1.metric(label="📈 Έσοδα Μήνα", value=f"{period_inc:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
+            col_s2.metric(label="📉 Έξοδα & Αναλήψεις Μήνα", value=f"{period_exp:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
+            col_s3.metric(label="💰 Τρέχον Υπόλοιπο Ταμείου (Drawer)", value=f"{total_drawer_balance:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
     
     # --- ΣΕΛΙΔΑ: ΠΑΡΑΠΟΝΑ & ΣΧΟΛΙΑ ---
     elif st.session_state.page == "complaints_page":
