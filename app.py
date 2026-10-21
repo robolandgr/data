@@ -461,11 +461,11 @@ else:
         # --- ΚΑΡΤΑ 2: ΠΑΡΟΥΣΙΟΛΟΓΙΟ & ΟΙΚΟΝΟΜΙΚΑ ---
         with col_m2:
             with st.container(border=True):
-                st.markdown("<div class='card-header'>💳 Λειτουργία & Ταμεία</div>", unsafe_allow_html=True)
-                if st.button("✅ Παρουσιολόγιο (Ιδιωτικά)", use_container_width=True, key="btn_att"):
+                st.markdown("<div class='card-header'>💳 Λειτουργία</div>", unsafe_allow_html=True)
+                if st.button("✅ Παρουσιολόγιο", use_container_width=True, key="btn_att"):
                     st.session_state.page = "attendances_page"
                     st.rerun()
-                if st.button("💵 Καταχώρηση Συνδρομής", use_container_width=True, key="btn_pay"):
+                if st.button("💵 Καταχώρηση Πληρωμής", use_container_width=True, key="btn_pay"):
                     st.session_state.page = "add_payment"
                     st.rerun()
                 if st.button("📊 Ιστορικό Πληρωμών", use_container_width=True, key="btn_hist_rep"):
@@ -478,7 +478,7 @@ else:
         # --- ΚΑΡΤΑ 3: ΕΞΟΔΑ, ΕΤΑΙΡΕΙΕΣ & ΑΝΑΦΟΡΕΣ ---
         with col_m3:
             with st.container(border=True):
-                st.markdown("<div class='card-header'>🏢 Επιχείρηση & Αναφορές</div>", unsafe_allow_html=True)
+                st.markdown("<div class='card-header'>🏢 Επιχείρηση </div>", unsafe_allow_html=True)
                 if st.button("🏢 Προμηθευτές / Εταιρείες", use_container_width=True, key="btn_suppliers"):
                     st.session_state.page = "corp_suppliers_page"
                     st.rerun()
