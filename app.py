@@ -1740,10 +1740,151 @@ else:
         if st.button("⬅️ Μενού", use_container_width=True): 
             st.session_state.page = "menu"
             st.rerun() 
-        st.subheader("Παράπονα & Σχόλια")
-        comp = load_specific_db("db_complaint")
-        if not comp.empty: 
-            st.dataframe(comp, use_container_width=True)
+        
+        st.subheader("🛠️ Διαχείριση Παραπόνων, Σχολίων & Παρατηρήσεων")
+        
+        cust_df = load_specific_db("db_customers")
+        comp_df = load_specific_db("db_complaint")
+        
+        if cust_df.empty:
+            st.warning("⚠️ Δεν βρέθηκαν πελάτες στη βάση.")
+        else:
+            # Αλφαβητική ταξινόμηση πελατών βάσει επωνύμου
+            if 'customer_lastname' in cust_df.columns and 'customer_firstname' in cust_df.columns:
+                cust_df = cust_df.sort_values(by=['customer_lastname', 'customer_firstname'], ascending=[True, True])
+
+            cust_df['display'] = cust_df['customer_lastname'].astype(str) + " " + cust_df['customer_firstname'].astype(str) + " (ID: " + cust_df['id_customer'].astype(str) + ")"
+            
+            action_mode = st.radio("Ενέργεια", ["➕ Νέα Καταχώρηση", "✏️ Τροποποίηση / Κλείσιμο Υπάρχοντος"], horizontal=True)
+            
+            if action_mode == "➕ Νέα Καταχώρηση":
+                sel_cust = st.selectbox("🔍 Επιλογή Πελάτη", options=["-- Επιλέξτε --"] + cust_df['display'].tolist(), key="new_comp_cust")
+                
+                if sel_cust != "-- Επιλέξτε --":
+                    row_c = cust_df[cust_df['display'] == sel_cust].iloc[0]
+                    c_id = str(row_c['id_customer']).strip()
+                    c_fn = str(row_c['customer_firstname']).strip()
+                    c_ln = str(row_c['customer_lastname']).strip()
+                    
+                    with st.form("new_complaint_form", clear_on_submit=True):
+                        choice_type = st.selectbox("Επιλογή Τύπου", options=["Σχόλιο", "Παράπονο", "Παρατήρηση"])
+                        subject = st.text_input("Θέμα / Τίτλος").strip()
+                        text_content = st.text_area("Κείμενο / Περιγραφή")
+                        staff_name = st.text_input("Υπεύθυνος / Καθηγητής (Staff)", value=st.session_state.get("username", "")).strip()
+                        
+                        if st.form_submit_button("💾 Αποθήκευση Καταχώρησης"):
+                            if not subject or not text_content:
+                                st.warning("⚠️ Συμπληρώστε Θέμα και Κείμενο!")
+                            else:
+                                try:
+                                    gc = get_gspread_client()
+                                    try:
+                                        sh_comp = gc.open(OLD_SHEET_NAME).worksheet("db_complaint")
+                                    except:
+                                        sh_comp = gc.open(OLD_SHEET_NAME).add_worksheet(title="db_complaint", rows="1000", cols="10")
+                                        sh_comp.append_row(["id_complaint", "id_customer", "customer_firstname", "customer_lastname", "complaint_date", "complaint_subject", "complaint_text", "complaint_staff", "status", "choice"])
+
+                                    recs = sh_comp.get_all_records()
+                                    nid = int(pd.DataFrame(recs)['id_complaint'].max()) + 1 if recs and 'id_complaint' in pd.DataFrame(recs).columns and not pd.DataFrame(recs).empty else 1
+                                    
+                                    today_str = datetime.today().strftime('%Y-%m-%d')
+                                    row_data = [
+                                        nid, int(c_id), c_fn, c_ln, today_str, subject, text_content, staff_name, "Ανοιχτό", choice_type
+                                    ]
+                                    
+                                    sh_comp.append_row(row_data)
+                                    st.success("✅ Η καταχώρηση αποθηκεύτηκε επιτυχώς ως Ανοιχτή!")
+                                    time.sleep(1.2)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Σφάλμα αποθήκευσης: {e}")
+
+            else: # Τροποποίηση / Κλείσιμο
+                st.markdown("#### ✏️ Τροποποίηση ή Κλείσιμο Καταχώρησης")
+                if comp_df.empty:
+                    st.info("Δεν υπάρχουν καταχωρημένα σχόλια ή παράπονα.")
+                else:
+                    comp_df.columns = comp_df.columns.astype(str).str.strip()
+                    # Φίλτρο για να βλέπει ανοιχτά ή όλα
+                    show_only_open = st.checkbox("Εμφάνιση μόνο Ανοιχτών", value=True)
+                    
+                    working_df = comp_df.copy()
+                    if show_only_open and 'status' in working_df.columns:
+                        working_df = working_df[working_df['status'].astype(str).str.strip().str.lower() == 'ανοιχτό']
+                    
+                    if working_df.empty:
+                        st.info("Δεν βρέθηκαν εγγραφές με αυτά τα κριτήρια.")
+                    else:
+                        working_df['display_comp'] = "ID: " + working_df['id_complaint'].astype(str) + " | " + working_df['customer_lastname'].astype(str) + " " + working_df['customer_firstname'].astype(str) + " (" + working_df['choice'].astype(str) + " - " + working_df['complaint_subject'].astype(str) + ")"
+                        
+                        sel_comp_str = st.selectbox("Επιλογή Εγγραφής προς Επεξεργασία", options=working_df['display_comp'].tolist())
+                        comp_row = working_df[working_df['display_comp'] == sel_comp_str].iloc[0]
+                        
+                        target_id = str(comp_row['id_complaint']).strip()
+                        cur_choice = str(comp_row.get('choice', 'Σχόλιο'))
+                        cur_subj = str(comp_row.get('complaint_subject', ''))
+                        cur_text = str(comp_row.get('complaint_text', ''))
+                        cur_staff = str(comp_row.get('complaint_staff', ''))
+                        cur_status = str(comp_row.get('status', 'Ανοιχτό'))
+                        
+                        choice_opts = ["Σχόλιο", "Παράπονο", "Παρατήρηση"]
+                        c_idx = choice_opts.index(cur_choice) if cur_choice in choice_opts else 0
+                        
+                        status_opts = ["Ανοιχτό", "Κλειστό"]
+                        s_idx = status_opts.index(cur_status) if cur_status in status_opts else 0
+
+                        with st.form("edit_complaint_form"):
+                            edit_choice = st.selectbox("Τύπος", options=choice_opts, index=c_idx)
+                            edit_subj = st.text_input("Θέμα / Τίτλος", value=cur_subj)
+                            edit_text = st.text_area("Κείμενο / Περιγραφή", value=cur_text)
+                            edit_staff = st.text_input("Υπεύθυνος (Staff)", value=cur_staff)
+                            edit_status = st.selectbox("Κατάσταση", options=status_opts, index=s_idx)
+                            
+                            if st.form_submit_button("💾 Αποθήκευση Αλλαγών"):
+                                try:
+                                    gc = get_gspread_client()
+                                    sh_comp = gc.open(OLD_SHEET_NAME).worksheet("db_complaint")
+                                    all_rows = sh_comp.get_all_values()
+                                    
+                                    for r_idx, r_val in enumerate(all_rows[1:], start=2):
+                                        if str(r_val[0]).strip() == target_id:
+                                            # id_complaint, id_customer, customer_firstname, customer_lastname, complaint_date, complaint_subject, complaint_text, complaint_staff, status, choice
+                                            sh_comp.update_cell(r_idx, 6, edit_subj)
+                                            sh_comp.update_cell(r_idx, 7, edit_text)
+                                            sh_comp.update_cell(r_idx, 8, edit_staff)
+                                            sh_comp.update_cell(r_idx, 9, edit_status)
+                                            sh_comp.update_cell(r_idx, 10, edit_choice)
+                                            break
+                                            
+                                    st.success("✅ Η εγγραφή ενημερώθηκε επιτυχώς! (Αν έγινε Κλειστό, αφαιρέθηκε από τα ενεργά ανοιχτά).")
+                                    time.sleep(1.2)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Σφάλμα ενημέρωσης: {e}")
+
+        # --- ΛΙΣΤΑ ΜΕ ΟΛΑ ΤΑ ΑΝΟΙΧΤΑ ---
+        st.markdown("---")
+        st.subheader("📋 Λίστα με όλα τα Ανοιχτά Σχόλια / Παράπονα")
+        if not comp_df.empty:
+            comp_df.columns = comp_df.columns.astype(str).str.strip()
+            open_comps = comp_df[comp_df['status'].astype(str).str.strip().str.lower() == 'ανοιχτό'].copy()
+            if open_comps.empty:
+                st.info("🎉 Δεν υπάρχουν ανοιχτά παράπονα ή σχόλια αυτή τη στιγμή!")
+            else:
+                renames_c = {
+                    'customer_lastname': 'Επώνυμο',
+                    'customer_firstname': 'Όνομα',
+                    'complaint_date': 'Ημερομηνία',
+                    'complaint_subject': 'Θέμα',
+                    'complaint_text': 'Κείμενο',
+                    'complaint_staff': 'Υπεύθυνος',
+                    'status': 'Κατάσταση',
+                    'choice': 'Τύπος'
+                }
+                show_df = open_comps.drop(columns=[c for c in ['id_complaint', 'id_customer'] if c in open_comps.columns]).rename(columns=renames_c)
+                st.dataframe(show_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("Δεν βρέθηκαν δεδομένα στη βάση `db_complaint`.")
 
     else:
         st.session_state.page = "menu"
