@@ -512,6 +512,9 @@ else:
                 if st.button("📋 Μητρώο Πελατών", use_container_width=True, key="btn_anafora"):
                     st.session_state.page = "anafora_pelaton"
                     st.rerun()
+                if st.button("📊 Ταμείο", use_container_width=True):
+                    st.session_state.page = "db_final_page"
+                    st.rerun()    
 
         st.markdown("<br>", unsafe_allow_html=True)
         
