@@ -489,7 +489,7 @@ else:
                 if st.button("💸 Καταχώρηση Εξόδων", use_container_width=True, key="btn_corp_pay"):
                     st.session_state.page = "corp_payments"
                     st.rerun()
-                if st.button("📊 Προβολή & Φίλτρα Εξόδων", use_container_width=True, key="btn_corp_rep"):
+                if st.button("📊 Προβολή Εξόδων", use_container_width=True, key="btn_corp_rep"):
                     st.session_state.page = "corp_payments_report"
                     st.rerun()
                 if st.button("📋 Μητρώο Πελατών", use_container_width=True, key="btn_anafora"):
