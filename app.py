@@ -411,7 +411,7 @@ else:
         st.markdown("<h2 style='text-align: center;'>Κεντρικό Μενού Διαχείρισης</h2>", unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
         
-        st.subheader("Διαχείριση Πελατών / Μαθητών")
+        st.subheader("Διαχείριση")
         col_c1, col_c2 = st.columns(2)
         with col_c1:
             if st.button("➕ Νέος Πελάτης (Πρώτη Εγγραφή)", use_container_width=True):
@@ -421,7 +421,7 @@ else:
                 st.session_state.page = "customer_registry"
                 st.rerun()
         with col_c2:
-            if st.button("👥 Διαχείριση Κατάστασης Πελατών (STOP/Επαναφορά)", use_container_width=True):
+            if st.button("👥 Διαχείριση Κατάστασης Πελατών", use_container_width=True):
                 st.session_state.page = "view_customers"
                 st.rerun()
             if st.button("🔄 Εισαγωγή Πελάτη σε Τμήμα", use_container_width=True):
@@ -432,19 +432,19 @@ else:
         st.subheader("Παρουσιολόγιο & Πληρωμές")
         col_pr1, col_pr2 = st.columns(2)
         with col_pr1:
-            if st.button("✅ Παρουσιολόγιο (Τμήμα Ιδιωτικά)", use_container_width=True):
+            if st.button("✅ Παρουσιολόγιο", use_container_width=True):
                 st.session_state.page = "attendances_page"
                 st.rerun()
         with col_pr2:
-            if st.button("💳 Καταχώρηση Πληρωμής (Συνδρομή)", use_container_width=True):
+            if st.button("💳 Καταχώρηση Πληρωμής", use_container_width=True):
                 st.session_state.page = "add_payment"
                 st.rerun()
 
         st.markdown("---")
-        st.subheader("Οικονομικά & Έξοδα")
+        st.subheader("Οικονομικά")
         col_p1, col_p2 = st.columns(2)
         with col_p1:
-            if st.button("📊 Αναφορά & Ιστορικό Πληρωμών Μαθητή", use_container_width=True):
+            if st.button("📊 Ιστορικό Πληρωμών ", use_container_width=True):
                 st.session_state.page = "payment_history_report"
                 st.rerun()
             if st.button("🏢 Καταχώρηση Εταιρειών / Προμηθευτών", use_container_width=True):
@@ -454,12 +454,12 @@ else:
             if st.button("💸 Καταχώρηση Εξόδων", use_container_width=True):
                 st.session_state.page = "corp_payments"
                 st.rerun()
-            if st.button("📊 Προβολή & Φίλτρα Εξόδων", use_container_width=True):
+            if st.button("📊 Ιστορικό Εξόδων", use_container_width=True):
                 st.session_state.page = "corp_payments_report"
                 st.rerun()
 
         st.markdown("---")
-        st.subheader("Διαχείριση Κέντρου")
+        st.subheader("Διαχείριση")
         if st.button("📚 Τμήματα", use_container_width=True):
             st.session_state.page = "add_structure"
             st.rerun()
@@ -482,12 +482,12 @@ else:
             st.session_state.page = "menu"
             st.rerun()
 
-        st.subheader("✅ Παρουσιολόγιο (Τμήμα: Ιδιωτικά)")
+        st.subheader("✅ Παρουσιολόγιο")
         
         years_options = ["2026-2027", "2027-2028", "2028-2029", "2029-2030"]
         selected_year_att = st.selectbox("📅 Επιλογή Σχολικού Έτους", options=years_options)
         
-        selected_date_obj = st.date_input("📅 Επιλογή Ημερομηνίας Παρουσιολογίου", value=datetime.today())
+        selected_date_obj = st.date_input("📅 Ημερομηνία", value=datetime.today())
         target_date_str = selected_date_obj.strftime('%Y-%m-%d')
         st.info(f"Επιλεγμένη Ημερομηνία Καταγραφής: **{target_date_str}** | Σχολικό Έτος: **{selected_year_att}**")
 
@@ -507,7 +507,7 @@ else:
             ].copy()
 
             if priv_regs.empty:
-                st.info(f"Δεν βρέθηκαν μαθητές στο τμήμα 'Ιδιωτικά' για το σχολικό έτος {selected_year_att}.")
+                st.info(f"Δεν βρέθηκαν μαθητές στο τμήμα για το σχολικό έτος {selected_year_att}.")
             else:
                 target_date_att = pd.DataFrame()
                 if not att_df.empty and 'date' in att_df.columns:
@@ -567,7 +567,7 @@ else:
                             'status': "ΝΑΙ" if val else "ΟΧΙ"
                         })
 
-                    if st.form_submit_button("💾 Αποθήκευση Παρουσιολογίου & Υπολογισμός Χρέους"):
+                    if st.form_submit_button("💾 Αποθήκευση Παρουσιολογίου"):
                         try:
                             gc = get_gspread_client()
                             
@@ -615,7 +615,7 @@ else:
                                     new_xreos = current_xreos + data['adj_cost']
                                     sh_reg.update_cell(r_idx, 12, new_xreos)
 
-                            st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε επιτυχώς (μόνο για ΝΑΙ & Ανοιχτές Πληρωμές)!")
+                            st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε επιτυχώς")
                             time.sleep(1.2)
                             st.rerun()
                         except Exception as e:
@@ -625,7 +625,7 @@ else:
                 pdf_bytes = generate_single_attendance_pdf(pdf_preview_rows, target_date_str, selected_year_att)
                 if pdf_bytes:
                     st.download_button(
-                        label="📥 Εκτύπωση / Λήψη Παρουσιολογίου Ημέρας (PDF)",
+                        label="📥 Λήψη Παρουσιολογίου",
                         data=pdf_bytes,
                         file_name=f"parousiologio_{target_date_str}.pdf",
                         mime="application/pdf"
@@ -669,7 +669,7 @@ else:
                 s_prog = st.selectbox("📚 Πρόγραμμα", options=prog_list)
                 
                 default_cost = float(str(reg_to_edit.get('adjusted_cost', 0)).replace(',', '.') or 0) if reg_to_edit is not None else 0.0
-                adj_cost = st.number_input("💰 Συμφωνηθέν Ποσό (adjusted_cost) (€)", value=default_cost, step=10.0)
+                adj_cost = st.number_input("💰 Συμφωνηθέν Ποσό (€)", value=default_cost, step=10.0)
                 
                 class_options = ["Xωρίς Τμήμα"] + (classes_df['class_name'].unique().tolist() if not classes_df.empty else [])
                 sel_class = st.selectbox("🏫 Τμήμα", options=class_options)
@@ -680,7 +680,7 @@ else:
                     val_en = str(reg_to_edit['energy']).strip()
                     if val_en in energy_options:
                         def_energy_idx = energy_options.index(val_en)
-                sel_energy = st.selectbox("💡 Τύπος Πληρωμής (energy)", options=energy_options, index=def_energy_idx)
+                sel_energy = st.selectbox("💡 Τύπος Πληρωμής", options=energy_options, index=def_energy_idx)
                 
                 bardia_options = ["Α Βάρδια", "Β Βάρδια"]
                 def_bardia_idx = 0
@@ -688,7 +688,7 @@ else:
                     val_bar = str(reg_to_edit['m_bardia']).strip()
                     if val_bar in bardia_options:
                         def_bardia_idx = bardia_options.index(val_bar)
-                sel_bardia = st.selectbox("🕒 Επιλογή Βάρδιας (M Bardia)", options=bardia_options, index=def_bardia_idx)
+                sel_bardia = st.selectbox("🕒 Επιλογή Βάρδιας", options=bardia_options, index=def_bardia_idx)
 
                 default_start_date = datetime.today()
                 if reg_to_edit is not None and 'start_date' in reg_to_edit:
@@ -766,10 +766,10 @@ else:
             with c2:
                 adr = st.text_input("Διεύθυνση").strip()
                 bd = st.date_input("Ημερομηνία Γέννησης", value=datetime(2015,1,1))
-                tax_user = st.text_input("Taxis User").strip()
-                tax_pass = st.text_input("Taxis Pass").strip()
-                adt = st.text_input("ADT").strip()
-                afm = st.text_input("AFM").strip()
+                tax_user = st.text_input("Taxis Username").strip()
+                tax_pass = st.text_input("Taxis Password").strip()
+                adt = st.text_input("Ταυτότητα").strip()
+                afm = st.text_input("ΑΦΜ").strip()
 
             if st.form_submit_button("💾 Αποθήκευση"):
                 if not cf or not cl:
@@ -837,10 +837,10 @@ else:
                         em = st.text_input("Email", value=str(row.get('email', '')))
                     with c2:
                         adr = st.text_input("Διεύθυνση", value=str(row.get('address', '')))
-                        tax_u = st.text_input("Taxis User", value=str(row.get('Taxis_User', '')))
-                        tax_p = st.text_input("Taxis Pass", value=str(row.get('Taxis_Pass', '')))
-                        adt_val = st.text_input("ADT", value=str(row.get('ADT', row.get('Passport', ''))))
-                        afm_val = st.text_input("AFM", value=str(row.get('AFM', '')))
+                        tax_u = st.text_input("Taxis Username", value=str(row.get('Taxis_User', '')))
+                        tax_p = st.text_input("Taxis Password", value=str(row.get('Taxis_Pass', '')))
+                        adt_val = st.text_input("Ταυτότητα", value=str(row.get('ADT', row.get('Passport', ''))))
+                        afm_val = st.text_input("ΑΦΜ", value=str(row.get('AFM', '')))
 
                     if st.form_submit_button("💾 Αποθήκευση Αλλαγών"):
                         try:
@@ -873,7 +873,7 @@ else:
             st.session_state.page = "menu"
             st.rerun()
 
-        st.subheader("Διαχείριση STOP & Κατάστασης Εγγραφών")
+        st.subheader("Διαχείριση Εγγραφών")
         reg_df = load_specific_db("db_registrations")
         cust_df = load_specific_db("db_customers")
 
@@ -925,10 +925,10 @@ else:
 
                         with st.form("stop_edit_form"):
                             st.markdown(f"**Επεξεργασία Εγγραφής ID:** {target_reg_id}")
-                            new_status = st.selectbox("📌 Κατάσταση (Status)", options=status_options, index=def_status_idx)
-                            new_cost = st.number_input("💰 Συμφωνηθέν Ποσό (adjusted_cost) (€)", value=current_cost, step=10.0, format="%.2f")
+                            new_status = st.selectbox("📌 Κατάσταση", options=status_options, index=def_status_idx)
+                            new_cost = st.number_input("💰 Συμφωνηθέν Ποσό (€)", value=current_cost, step=10.0, format="%.2f")
                             
-                            new_stop_date = st.date_input("📅 Ημερομηνία Σταματήματος (stop_date)", value=parsed_date)
+                            new_stop_date = st.date_input("📅 Ημερομηνία Σταματήματος", value=parsed_date)
                             
                             if st.form_submit_button("💾 Αποθήκευση Αλλαγών"):
                                 try:
@@ -1064,7 +1064,7 @@ else:
                             try: xreos_val = float(xreos_str) if xreos_str.strip() != '' else 0.0
                             except: xreos_val = 0.0
 
-                        st.info(f"💰 **Συμφωνηθέν Ποσό (adjusted_cost):** {adjusted_val:.2f}€ | 📉 **Τρέχον Χρέος (xreos):** {xreos_val:.2f}€")
+                        st.info(f"💰 **Συμφωνηθέν Ποσό:** {adjusted_val:.2f}€ | 📉 **Υπόλοιπο:** {xreos_val:.2f}€")
 
                         with st.form("pay"):
                             rec = st.text_input("Αρ. Απόδειξης").strip()
@@ -1115,13 +1115,13 @@ else:
             st.session_state.page = "menu"
             st.rerun()
 
-        st.subheader("📊 Αναφορά & Ιστορικό Πληρωμών")
+        st.subheader("📊 Αναφορά Πληρωμών")
         
         pays_df = load_specific_db("db_payments")
         cust_df = load_specific_db("db_customers")
         regs_df = load_specific_db("db_registrations")
 
-        st.markdown("### 📋 Οικονομική Αναφορά")
+        st.markdown("### 📋 Συγκεντρωτικός Πίνακας Πληρωμών")
         
         all_years_opt = ["ΟΛΑ"] + (sorted(regs_df['school_year'].dropna().astype(str).unique().tolist(), reverse=True) if not regs_df.empty else ["2026-2027"])
         sel_sum_year = st.selectbox("📅 Επιλογή Σχολικού Έτους", options=all_years_opt, key="sum_year_filter")
@@ -1188,10 +1188,10 @@ else:
                 st.markdown("<br>", unsafe_allow_html=True)
                 m1, m2 = st.columns(2)
                 m1.metric("💳 Συνολικά Πληρωμένα", f"{tot_paid:.2f} €")
-                m2.metric("⚠️ Συνολικό Υπόλοιπο (Χρέος)", f"{tot_xreos:.2f} €")
+                m2.metric("⚠️ Συνολικό Υπόλοιπο", f"{tot_xreos:.2f} €")
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                if st.button("📥 Εκτύπωση Συγκεντρωτικού Πίνακα (PDF)"):
+                if st.button("📥 Εκτύπωση Συγκεντρωτικού Πίνακα"):
                     pdf_sum_buf = generate_summary_payments_pdf(summary_df, sel_sum_year, "Ιδιωτικά")
                     if pdf_sum_buf:
                         st.download_button(
@@ -1202,7 +1202,7 @@ else:
                         )
 
         st.markdown("---")
-        st.markdown("### 🔍 Αναλυτικό Ιστορικό Μαθητή (Ιδιωτικά)")
+        st.markdown("### 🔍 Ιστορικό Πληρωμών /Μαθητή ")
 
         if cust_df.empty:
             st.info("Δεν βρέθηκαν δεδομένα πελατών.")
@@ -1228,7 +1228,7 @@ else:
                     if not regs_df.empty:
                         user_regs = regs_df[(regs_df['id_customer'].astype(str).str.strip() == c_id) & (regs_df['class'].astype(str).str.strip().str.lower() == 'ιδιωτικά')]
 
-                    st.markdown(f"#### ⚙️ Φίλτρο Έτους για: **{cust_full_name}**")
+                    st.markdown(f"#### ⚙️ Πληρωμές: **{cust_full_name}**")
                     ind_years = ["ΟΛΑ"] + (sorted(user_regs['school_year'].dropna().astype(str).unique().tolist(), reverse=True) if not user_regs.empty else ["2026-2027"])
                     sel_ind_year = st.selectbox("📅 Έτος Μαθητή", options=ind_years, key="ind_year")
 
@@ -1238,7 +1238,7 @@ else:
                         cust_pays = pays_df[pays_df['id_customer'].astype(str).str.strip() == c_id].copy()
 
                         if cust_pays.empty:
-                            st.info(f"Ο μαθητής {cust_full_name} δεν έχει καμία καταχωρημένη πληρωμή.")
+                            st.info(f"Ο/Η μαθητής-τρια {cust_full_name} δεν έχει καμία καταχωρημένη πληρωμή.")
                         else:
                             if sel_ind_year != "ΟΛΑ":
                                 if 'school_year' in cust_pays.columns:
@@ -1262,11 +1262,11 @@ else:
                                 st.success(f"💰 **Συνολικό Ποσό Πληρωμών Μαθητή:** {total_paid:.2f} €")
 
                                 st.markdown("<br>", unsafe_allow_html=True)
-                                if st.button("📥 Παραγωγή PDF Ατομικού Ιστορικού"):
+                                if st.button("📥 Εκτύπωση ατομικής αναφοράς"):
                                     pdf_buffer = generate_customer_payment_history_pdf(cust_full_name, sel_ind_year, display_pays)
                                     if pdf_buffer:
                                         st.download_button(
-                                            label="📥 Κατεβάστε το PDF Ατομικού Ιστορικού",
+                                            label="📥 Κατεβάστε το PDF",
                                             data=pdf_buffer,
                                             file_name=f"istoriko_pliromon_{c_id}.pdf",
                                             mime="application/pdf"
@@ -1306,10 +1306,10 @@ else:
                 inv = st.text_input("Αρ. Παραστατικού (Invoice Number)")
                 sup_name = st.selectbox("Προμηθευτής / Εταιρεία", options=suppliers_list)
                 school_yr = st.selectbox("Σχολικό Έτος", options=["2026-2027", "2027-2028", "2028-2029", "2029-2030"])
-                inv_date = st.date_input("Ημερομηνία Παραστατικού (Invoice Date)", value=datetime.today())
-                pay_date = st.date_input("Ημερομηνία Πληρωμής (Payment Date)", value=datetime.today())
+                inv_date = st.date_input("Ημερομηνία Παραστατικού", value=datetime.today())
+                pay_date = st.date_input("Ημερομηνία Πληρωμής", value=datetime.today())
                 amt = st.number_input("Ποσό (€)", min_value=0.0, format="%.2f")
-                pay_method = st.selectbox("Τρόπος Πληρωμής", options=["Μετρητά", "Κατάθεση", "POS", "Επιταγή"])
+                pay_method = st.selectbox("Τρόπος Πληρωμής", options=["Μετρητά", "Κατάθεση", "POS"])
 
                 if st.form_submit_button("💾 Αποθήκευση Εξόδου"):
                     try:
@@ -1349,7 +1349,7 @@ else:
             st.session_state.page = "menu"
             st.rerun() 
         
-        st.subheader("📊 Λίστα & Φίλτρα Εξόδων Επιχείρησης")
+        st.subheader("📊 Πίνακας Εξόδων Επιχείρησης")
         
         try:
             gc = get_gspread_client()
@@ -1389,7 +1389,7 @@ else:
             sel_year_exp = col_f1.selectbox("📅 Φίλτρο ανά Σχολικό Έτος", options=available_years, key="exp_year_filter")
 
             available_suppliers = ["ΟΛΑ"] + sorted(exp_df['company_name'].dropna().astype(str).unique().tolist()) if 'company_name' in exp_df.columns else ["ΟΛΑ"]
-            sel_sup_exp = col_f2.selectbox("🏢 Φίλτρο ανά Προμηθευτή", options=available_suppliers, key="exp_sup_filter")
+            sel_sup_exp = col_f2.selectbox("🏢 Επιλογή Προμηθευτή", options=available_suppliers, key="exp_sup_filter")
 
             filtered_exp = exp_df.copy()
             if sel_year_exp != "ΟΛΑ":
@@ -1431,7 +1431,7 @@ else:
         if struct_mode == "Δημιουργία Νέου Τμήματος":
             st.markdown("#### Δημιουργία Νέου Τμήματος")
             with st.form("new_class_form", clear_on_submit=True):
-                new_class_name = st.text_input("Όνομα Νέου Τμήματος (π.χ. Τμήμα Α, Group 1)").strip()
+                new_class_name = st.text_input("Όνομα Τμήματος").strip()
                 sel_prog_for_class = st.selectbox("📚 Επιλογή Προγράμματος", options=prog_options if prog_options else ["-- Κανένα Πρόγραμμα --"])
                 
                 year_options = [f"{y}-{y+1}" for y in range(2026, 2030)]
@@ -1531,7 +1531,7 @@ else:
                             st.error(f"Σφάλμα ενημέρωσης τμήματος: {e}")
 
         st.markdown("---")
-        st.markdown("#### Υπάρχοντα Τμήματα")
+        st.markdown("#### Ενεργά Τμήματα")
         c_df_refreshed = load_specific_db("db_class")
         if not c_df_refreshed.empty:
             st.dataframe(c_df_refreshed, use_container_width=True, hide_index=True)
@@ -1539,7 +1539,7 @@ else:
             st.info("Δεν βρέθηκαν τμήματα.")
 
         st.markdown("---")
-        st.markdown("#### Υπάρχοντα Προγράμματα")
+        st.markdown("#### Ενεργά Προγράμματα")
         if not progs_df.empty:
             st.dataframe(progs_df, use_container_width=True, hide_index=True)
         else:
@@ -1551,7 +1551,7 @@ else:
             st.session_state.page = "menu"
             st.rerun() 
         
-        st.subheader("📋 Μητρώο Πελατών & Εγγραφών")
+        st.subheader("📋 Μητρώο Μαθητών")
         reg_df = load_specific_db("db_registrations")
         cust_df = load_specific_db("db_customers")
         
@@ -1588,12 +1588,12 @@ else:
 
             col_f1, col_f2 = st.columns(2)
             available_years = ["ΟΛΑ"] + sorted(merged_df['school_year'].dropna().astype(str).unique().tolist(), reverse=True)
-            sel_year_filter = col_f1.selectbox("📅 Φίλτρο ανά Σχολικό Έτος", options=available_years, key="anafora_year_filter")
+            sel_year_filter = col_f1.selectbox("📅 Σχολικό Έτος", options=available_years, key="anafora_year_filter")
             
             available_classes = sorted(merged_df['class'].dropna().astype(str).unique().tolist())
             if not available_classes:
                 available_classes = ["Ιδιωτικά", "Voucher"]
-            sel_class_filter = col_f2.selectbox("🏫 Επιλογή Τμήματος (Class)", options=available_classes, key="anafora_class_filter")
+            sel_class_filter = col_f2.selectbox("🏫 Επιλογή Τμήματος", options=available_classes, key="anafora_class_filter")
             
             filtered_reg = merged_df.copy()
             if sel_year_filter != "ΟΛΑ":
@@ -1664,12 +1664,12 @@ else:
         st.subheader("🏢 Καταχώρηση Νέας Εταιρείας / Προμηθευτή")
         
         with st.form("supplier_form"):
-            company_name = st.text_input("Επωνυμία Εταιρείας (Company Name)")
-            vat_number = st.text_input("ΑΦΜ (VAT Number)")
-            tax_office = st.text_input("ΔΟΥ (Tax Office)")
-            address = st.text_input("Διεύθυνση (Address)")
+            company_name = st.text_input("Επωνυμία Εταιρείας")
+            vat_number = st.text_input("ΑΦΜ")
+            tax_office = st.text_input("ΔΟΥ")
+            address = st.text_input("Διεύθυνση")
             email = st.text_input("Email")
-            phone = st.text_input("Τηλέφωνο (Phone)")
+            phone = st.text_input("Τηλέφωνο")
             
             if st.form_submit_button("💾 Αποθήκευση Εταιρείας"):
                 if not company_name.strip():
@@ -1694,7 +1694,7 @@ else:
                         st.error(f"Σφάλμα αποθήκευσης εταιρείας: {e}")
 
         st.markdown("---")
-        st.subheader("📋 Λίστα Καταχωρημένων Εταιρειών")
+        st.subheader("📋 Λίστα Εταιρειών")
         try:
             gc = get_gspread_client()
             comp_df = pd.DataFrame(gc.open(OLD_SHEET_NAME).worksheet("db_customers_company").get_all_records())
