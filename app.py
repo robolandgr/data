@@ -147,7 +147,7 @@ def update_customer_xreos(c_id, school_year, program):
                 (df_att['id_customer'].astype(str).str.strip() == str(c_id)) & 
                 (df_att['school_year'].astype(str).str.strip() == str(school_year)) & 
                 (df_att['status'].astype(str).str.strip().str.upper() == 'ΝΑΙ')
-            ]
+            ])
             
             # Αν υπάρχει στήλη ημερομηνίας, διασφαλίζουμε ότι δεν μετράμε διπλές εγγραφές της ίδιας μέρας
             if 'date' in df_att.columns:
