@@ -163,9 +163,13 @@ def update_customer_xreos(c_id, school_year, program):
             )
             total_paid = pd.to_numeric(df_pay.loc[mask_pay, 'amount_paid'], errors='coerce').fillna(0).sum()
 
-        # 5. Τρέχον Υπόλοιπο = (Συνολικά ΝΑΙ * adjusted_cost) - Συνολικές Πληρωμές
-        # (Επιτρέπουμε αρνητικές τιμές για πιστωτικό υπόλοιπο / προπληρωμή)
+        # 👉 ΠΡΟΣΘΕΣΕ ΑΥΤΑ ΤΑ 3 st.write ΓΙΑ ΝΑ ΔΟΥΜΕ ΤΙΣ ΤΙΜΕΣ
+        st.write(f"DEBUG -> Κόστος Μαθημάτων (total_lessons_cost): {total_lessons_cost}")
+        st.write(f"DEBUG -> Συνολικές Πληρωμές (total_paid): {total_paid}")
+
+        # 5. Τρέχον Υπόλοιπο
         current_xreos = total_lessons_cost - total_paid
+        st.write(f"DEBUG -> Τελικό Υπόλοιπο (current_xreos): {current_xreos}")
 
         # 6. Ενημέρωση του πεδίου xreos στη στήλη L (index 12 / στήλη 12) του db_registrations
         sh_reg.update_cell(reg_row_idx, 12, current_xreos)
