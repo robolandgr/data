@@ -1699,25 +1699,25 @@ else:
             available_years = ["ΟΛΑ"] + sorted(merged_df['school_year'].dropna().astype(str).unique().tolist(), reverse=True)
             sel_year_filter = col_f1.selectbox("📅 Σχολικό Έτος", options=available_years, key="anafora_year_filter")
             
-            available_classes = sorted(merged_df['class'].dropna().astype(str).unique().tolist())
-            if not available_classes:
-                available_classes = ["Ιδιωτικά", "Voucher"]
-            sel_class_filter = col_f2.selectbox("🏫 Επιλογή Τμήματος", options=available_classes, key="anafora_class_filter")
+            # Προσθήκη του "ΟΛΑ" ως default επιλογή στα τμήματα
+            available_classes = ["ΟΛΑ"] + sorted(merged_df['class'].dropna().astype(str).unique().tolist())
+            sel_class_filter = col_f2.selectbox("🏫 Επιλογή Τμήματος", options=available_classes, index=0, key="anafora_class_filter")
             
             filtered_reg = merged_df.copy()
             if sel_year_filter != "ΟΛΑ":
                 filtered_reg = filtered_reg[filtered_reg['school_year'].astype(str).str.strip() == sel_year_filter]
             
-            if sel_class_filter:
+            if sel_class_filter != "ΟΛΑ":
                 filtered_reg = filtered_reg[filtered_reg['class'].astype(str).str.strip().str.lower() == sel_class_filter.strip().lower()]
 
             st.markdown(f"**Τμήμα:** `{sel_class_filter}` | **Βρέθηκαν εγγραφές:** {len(filtered_reg)}")
 
             if filtered_reg.empty:
-                st.info("Δεν βρέθηκαν εγγραφές με τα επιλεγμένα φίλτρα.")
+                st.info("Δεν βρέθηκαν εγγραφές με τα επιλεγμένα κριτήρια.")
             else:
                 class_lower = sel_class_filter.strip().lower()
                 
+                # Ορισμός επιθυμητών στηλών ανάλογα με το επιλεγμένο τμήμα
                 if class_lower == "ιδιωτικά":
                     desired_cols = [
                         'customer_firstname', 'customer_lastname', 
@@ -1732,17 +1732,29 @@ else:
                         'telephone', 'email', 
                         'status', 'stop_date', 'm_bardia'
                     ]
-                else:
-                    desired_cols = filtered_reg.columns.tolist()
+                elif class_lower == "pre-register":
+                    desired_cols = [
+                        'id_customer', 'customer_firstname', 'customer_lastname', 
+                        'parent_firstname', 'parent_lastname', 
+                        'class', 'school_year', 'telephone', 'email'
+                    ]
+                else: # Επιλογή "ΟΛΑ"
+                    desired_cols = [
+                        'id_customer', 'customer_firstname', 'customer_lastname', 
+                        'class', 'school_year', 'telephone', 'email'
+                    ]
 
                 existing_cols = [c for c in desired_cols if c in filtered_reg.columns]
                 grid_df = filtered_reg[existing_cols].copy()
 
                 renames = {
+                    'id_customer': 'ID Πελάτη',
                     'customer_lastname': 'Επώνυμο Μαθητή',
                     'customer_firstname': 'Όνομα Μαθητή',
                     'parent_firstname': 'Όνομα Γονέα',
                     'parent_lastname': 'Επώνυμο Γονέα',
+                    'class': 'Τμήμα',
+                    'school_year': 'Σχολικό Έτος',
                     'telephone': 'Τηλέφωνο',
                     'email': 'Email',
                     'status': 'Κατάσταση',
