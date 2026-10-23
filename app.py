@@ -1154,43 +1154,41 @@ else:
                                 pay_method = st.selectbox("Τρόπος Πληρωμής", ["Μετρητά", "Εθνική", "Eurobank", "POS"])
                                 
                                 if st.form_submit_button("💾 Αποθήκευση"):
-                                    if not rec or amt <= 0:
-                                        st.warning("⚠️ Συμπληρώστε αριθμό απόδειξης και έγκυρο ποσό!")
-                                    else:
-                                        try:
-                                            gc = get_gspread_client()
-                                            sh = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
-                                            
-                                            rows_data = sh.get_all_values()
-                                            nid = 1
-                                            if len(rows_data) > 1:
-                                                ids = []
-                                                for r in rows_data[1:]:
-                                                    if r and r[0].isdigit():
-                                                        ids.append(int(r[0]))
-                                                if ids:
-                                                    nid = max(ids) + 1
-                            
-                                            sh.append_row([
-                                                nid,                            # 1: id_payment
-                                                int(c_id),                      # 2: id_customer
-                                                str(row['customer_lastname']),    # 3: customer_lastname
-                                                str(row['customer_firstname']),   # 4: customer_firstname
-                                                datetime.today().strftime('%Y-%m-%d'), # 5: payment_date
-                                                rec,                            # 6: receipt_number
-                                                amt,                            # 7: amount_paid
-                                                str(yr),                        # 8 (Στήλη H): school_year
-                                                pay_method                      # 9: pay_method
-                                            ])
-                                            
-                                            update_customer_xreos(c_id, yr, prog)
-                                            
-                                            st.success("✅ Η πληρωμή καταχωρήθηκε επιτυχώς!")
-                                            time.sleep(1.2)
-                                            st.rerun()
-                                        except Exception as e:
-                                            st.error(f"Σφάλμα κατά την αποθήκευση: {e}")
+                        gc = get_gspread_client()
+                        sh = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
+                        recs = sh.get_all_records()
+                        nid = int(pd.DataFrame(recs)['id_payment'].max()) + 1 if recs and 'id_payment' in pd.DataFrame(recs).columns else 1
+                        
+                        # 1. Αποθήκευση πληρωμής
+                        sh.append_row([nid, row['id_customer'], row['customer_lastname'], row['customer_firstname'], datetime.today().strftime('%Y-%m-%d'), rec, amt, yr, "Μετρητά", prog])
+                        
+                        # 2. ΕΝΗΜΕΡΩΣΗ ΧΡΕΟΥΣ & TOTAL_PAID ΑΠΕΥΘΕΙΑΣ ΕΔΩ:
+                        try:
+                            sh_reg = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
+                            reg_records = sh_reg.get_all_records()
+                            for ri, r_row in enumerate(reg_records, start=2): # start=2 για τα Google Sheet rows
+                                if str(r_row.get('id_customer', '')).strip() == str(row['id_customer']).strip() and str(r_row.get('school_year', '')).strip() == str(yr).strip() and str(r_row.get('program', '')).strip() == str(prog).strip():
+                                    
+                                    # Διαβάζουμε τρέχοντα
+                                    curr_xreos = float(str(r_row.get('xreos', 0)).replace(',', '.') or 0.0)
+                                    curr_total_paid = float(str(r_row.get('total_paid', 0)).replace(',', '.') or 0.0)
+                                    
+                                    # Νέες τιμές
+                                    new_xreos = curr_xreos - float(amt)
+                                    new_total_paid = curr_total_paid + float(amt)
+                                    
+                                    # Ενημέρωση κελίων (Στήλη L / 12 για xreos, Στήλη O / 15 για total_paid)
+                                    sh_reg.update_cell(ri, 12, new_xreos)
+                                    sh_reg.update_cell(ri, 15, new_total_paid)
+                                    break
+                        except Exception as ex:
+                            print(f"Error updating reg: {ex}")
 
+                        check_and_update_status_to_finish(row['id_customer'], yr, prog)
+                        st.success("✅ Καταχωρήθηκε και ενημερώθηκε το ταμείο!")
+                        time.sleep(1.2)
+                        st.rerun()
+                        
     # --- ΣΕΛΙΔΑ: ΑΝΑΦΟΡΑ & ΙΣΤΟΡΙΚΟ ΠΛΗΡΩΜΩΝ ΜΑΘΗΤΗ ---
     elif st.session_state.page == "payment_history_report":
         if st.button("⬅️ Μενού", use_container_width=True): 
