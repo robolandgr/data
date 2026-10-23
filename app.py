@@ -131,19 +131,14 @@ def update_customer_xreos(c_id, school_year, program, new_payment_amt=0.0):
         current_xreos = float(str(r_item.get('xreos', 0)).replace(',', '.') or 0.0)
         current_total_paid = float(str(r_item.get('total_paid', 0)).replace(',', '.') or 0.0)
         
-        # 2. Αν έγινε νέα πληρωμή, την προσθέτουμε στις συνολικές πληρωμές και τη αφαιρούμε από το χρέος
+        # 2. Αν έγινε νέα πληρωμή, την προσθέτουμε στις συνολικές πληρωμές και την αφαιρούμε από το χρέος
         if new_payment_amt > 0:
             new_total_paid = current_total_paid + float(new_payment_amt)
             new_xreos = current_xreos - float(new_payment_amt)
             
-            # Βρίσκουμε σε ποιες στήλες βρίσκονται τα πεδία total_paid και xreos στο Google Sheet
-            cols = list(df_reg.columns)
-            xreos_col_idx = cols.index('xreos') + 1 if 'xreos' in cols else 12
-            total_paid_col_idx = cols.index('total_paid') + 1 if 'total_paid' in cols else 13 # Προσαρμόσε το αν η στήλη είναι αλλού
-            
-            # Ενημέρωση Google Sheet
-            sh_reg.update_cell(reg_row_idx, xreos_col_idx, new_xreos)
-            sh_reg.update_cell(reg_row_idx, total_paid_col_idx, new_total_paid)
+            # Στήλη L (12) για το xreos, Στήλη O (15) για το total_paid
+            sh_reg.update_cell(reg_row_idx, 12, new_xreos)
+            sh_reg.update_cell(reg_row_idx, 15, new_total_paid)
 
     except Exception as e:
         print(f"Error updating xreos: {e}")
