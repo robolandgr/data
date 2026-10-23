@@ -107,26 +107,38 @@ def update_customer_xreos(c_id, school_year, new_payment_amt=0.0):
         gc = get_gspread_client()
         sh_reg = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
         regs_data = sh_reg.get_all_records()
+        if not regs_data:
+            return
+            
         df_reg = pd.DataFrame(regs_data)
         df_reg.columns = df_reg.columns.astype(str).str.strip()
         
-        # Βρίσκουμε τη γραμμή του μαθητή αποκλειστικά με ID και Σχολικό Έτος
-        mask_reg = (
-            (df_reg['id_customer'].astype(str).str.strip() == str(c_id)) & 
-            (df_reg['school_year'].astype(str).str.strip() == str(school_year))
-        )
+        # Καθαρισμός ID και έτους για να ταιριάζουν 100%
+        target_id = str(c_id).strip()
+        target_year = str(school_year).strip()
         
-        matched_regs = df_reg[mask_reg]
-        if matched_regs.empty:
+        df_reg['id_clean'] = df_reg['id_customer'].astype(str).str.strip()
+        df_reg['year_clean'] = df_reg['school_year'].astype(str).str.strip()
+        
+        matched = df_reg[(df_reg['id_clean'] == target_id) & (df_reg['year_clean'] == target_year)]
+        
+        if matched.empty:
+            # Αν δεν βρει ακριβές έτος, δοκιμάζουμε μόνο με ID για να μην κολλήσει ποτέ
+            matched = df_reg[df_reg['id_clean'] == target_id]
+            
+        if matched.empty:
             return
             
-        # Αν υπάρχουν πολλαπλές εγγραφές για τον ίδιο μαθητή, παίρνουμε την πρώτη ή κάνουμε loop σε όλες
-        for idx_row in matched_regs.index:
-            reg_row_idx = idx_row + 2 # Google Sheet row index
+        for idx_row in matched.index:
+            reg_row_idx = idx_row + 2 # Google Sheet row index (ξεκινάει από 2 λόγω headers)
             r_item = df_reg.iloc[idx_row]
             
-            current_xreos = float(str(r_item.get('xreos', 0)).replace(',', '.') or 0.0)
-            current_total_paid = float(str(r_item.get('total_paid', 0)).replace(',', '.') or 0.0)
+            # Διάβαστη τρέχοντος χρέους και total_paid
+            raw_xreos = str(r_item.get('xreos', 0)).replace(',', '.').strip()
+            current_xreos = float(raw_xreos) if raw_xreos and raw_xreos != '' else 0.0
+            
+            raw_paid = str(r_item.get('total_paid', 0)).replace(',', '.').strip()
+            current_total_paid = float(raw_paid) if raw_paid and raw_paid != '' else 0.0
             
             if new_payment_amt > 0:
                 new_total_paid = current_total_paid + float(new_payment_amt)
@@ -137,9 +149,8 @@ def update_customer_xreos(c_id, school_year, new_payment_amt=0.0):
                 sh_reg.update_cell(reg_row_idx, 15, new_total_paid)
 
     except Exception as e:
-        print(f"Error updating xreos: {e}")
-        pass
-        
+        print(f"Error in update_customer_xreos: {e}")
+        pass        
 def generate_single_attendance_pdf(attendance_rows, date_str, school_year):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
