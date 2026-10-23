@@ -134,23 +134,33 @@ def update_customer_xreos(c_id, school_year, program):
         except:
             adj_cost = 0.0
 
-        # 2. Μετράμε τις συνολικές παρουσίες "ΝΑΙ" από το db_attendances για το συγκεκριμένο έτος
+        # 2. Μετράμε τις μοναδικές παρουσίες "ΝΑΙ" από το db_attendances για το συγκεκριμένο έτος
         sh_att = gc.open(OLD_SHEET_NAME).worksheet("db_attendances")
         att_data = sh_att.get_all_records()
         total_nais = 0
         if att_data:
             df_att = pd.DataFrame(att_data)
             df_att.columns = df_att.columns.astype(str).str.strip()
-            total_nais = df_att[
+            
+            # Φιλτράρισμα για τον μαθητή και το έτος
+            mask_att = (
                 (df_att['id_customer'].astype(str).str.strip() == str(c_id)) & 
                 (df_att['school_year'].astype(str).str.strip() == str(school_year)) & 
                 (df_att['status'].astype(str).str.strip().str.upper() == 'ΝΑΙ')
-            ].shape[0]
+            ]
+            
+            # Αν υπάρχει στήλη ημερομηνίας, διασφαλίζουμε ότι δεν μετράμε διπλές εγγραφές της ίδιας μέρας
+            if 'date' in df_att.columns:
+                df_att_filtered = df_att[mask_att].drop_duplicates(subset=['date', 'id_customer', 'school_year'])
+            else:
+                df_att_filtered = df_att[mask_att]
+                
+            total_nais = len(df_att_filtered)
 
         # 3. Υπολογίζουμε το συνολικό κόστος μαθημάτων
         total_lessons_cost = total_nais * adj_cost
 
-        # 4. Αθροίζουμε όλες τις πληρωμές του μαθητή για το συγκεκριμένο έτος
+        # 4. Αθροίζουμε όλες τις πληρωμές του μαθητή για το συγκεκριμένο έτος (χωρίς διπλομετρήσεις)
         sh_pay = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
         pay_data = sh_pay.get_all_records()
         total_paid = 0.0
@@ -160,16 +170,19 @@ def update_customer_xreos(c_id, school_year, program):
             mask_pay = (
                 (df_pay['id_customer'].astype(str).str.strip() == str(c_id)) & 
                 (df_pay['school_year'].astype(str).str.strip() == str(school_year))
-            )
-            total_paid = pd.to_numeric(df_pay.loc[mask_pay, 'amount_paid'], errors='coerce').fillna(0).sum()
+            ]
+            
+            # Αν υπάρχει ID πληρωμής ή ημερομηνία+ποσό, αποτρέπουμε τυχόν διπλοαθροίσεις
+            if 'id' in df_pay.columns:
+                df_pay_filtered = df_pay[mask_pay].drop_duplicates(subset=['id'])
+            else:
+                df_pay_filtered = df_pay[mask_pay].drop_duplicates()
+                
+            total_paid = pd.to_numeric(df_pay_filtered['amount_paid'], errors='coerce').fillna(0).sum()
 
-        # 👉 ΠΡΟΣΘΕΣΕ ΑΥΤΑ ΤΑ 3 st.write ΓΙΑ ΝΑ ΔΟΥΜΕ ΤΙΣ ΤΙΜΕΣ
-        st.write(f"DEBUG -> Κόστος Μαθημάτων (total_lessons_cost): {total_lessons_cost}")
-        st.write(f"DEBUG -> Συνολικές Πληρωμές (total_paid): {total_paid}")
-
-        # 5. Τρέχον Υπόλοιπο
+        # 5. Τρέχον Υπόλοιπο = (Συνολικά ΝΑΙ * adjusted_cost) - Συνολικές Πληρωμές
+        # (Επιτρέπονται κανονικά οι αρνητικές τιμές, π.χ. -10€, -20€ όταν υπάρχει προπληρωμή)
         current_xreos = total_lessons_cost - total_paid
-        st.write(f"DEBUG -> Τελικό Υπόλοιπο (current_xreos): {current_xreos}")
 
         # 6. Ενημέρωση του πεδίου xreos στη στήλη L (index 12 / στήλη 12) του db_registrations
         sh_reg.update_cell(reg_row_idx, 12, current_xreos)
