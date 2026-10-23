@@ -102,11 +102,11 @@ def remove_accents(input_str):
     nfkd_form = unicodedata.normalize('NFKD', input_str)
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
-def update_customer_xreos(c_id, school_year, program):
+def update_customer_xreos(c_id, school_year, program, new_payment_amt=0.0):
     try:
         gc = get_gspread_client()
         
-        # 1. Παίρνουμε το adjusted_cost από το db_registrations
+        # 1. Παίρνουμε τα δεδομένα από το db_registrations
         sh_reg = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
         regs_data = sh_reg.get_all_records()
         df_reg = pd.DataFrame(regs_data)
@@ -127,66 +127,26 @@ def update_customer_xreos(c_id, school_year, program):
         reg_row_idx = matched_regs.index[0] + 2 # Google sheet row index
         r_item = matched_regs.iloc[0]
         
-        adj_cost = 0.0
-        try:
-            adj_str = str(r_item.get('adjusted_cost', 0)).replace(',', '.')
-            adj_cost = float(adj_str) if adj_str.strip() != '' else 0.0
-        except:
-            adj_cost = 0.0
-
-        # 2. Μετράμε τις μοναδικές παρουσίες "ΝΑΙ" από το db_attendances για το συγκεκριμένο έτος
-        sh_att = gc.open(OLD_SHEET_NAME).worksheet("db_attendances")
-        att_data = sh_att.get_all_records()
-        total_nais = 0
-        if att_data:
-            df_att = pd.DataFrame(att_data)
-            df_att.columns = df_att.columns.astype(str).str.strip()
-            
-            # Διόρθωση παρένθεσης εδώ (από ] σε ))
-            mask_att = (
-                (df_att['id_customer'].astype(str).str.strip() == str(c_id)) & 
-                (df_att['school_year'].astype(str).str.strip() == str(school_year)) & 
-                (df_att['status'].astype(str).str.strip().str.upper() == 'ΝΑΙ')
-            )
-            
-            if 'date' in df_att.columns:
-                df_att_filtered = df_att[mask_att].drop_duplicates(subset=['date', 'id_customer', 'school_year'])
-            else:
-                df_att_filtered = df_att[mask_att]
-                
-            total_nais = len(df_att_filtered)
-
-        # 3. Υπολογίζουμε το συνολικό κόστος μαθημάτων
-        total_lessons_cost = total_nais * adj_cost
-
-        # 4. Αθροίζουμε όλες τις πληρωμές του μαθητή για το συγκεκριμένο έτος
-        sh_pay = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
-        pay_data = sh_pay.get_all_records()
-        total_paid = 0.0
-        if pay_data:
-            df_pay = pd.DataFrame(pay_data)
-            df_pay.columns = df_pay.columns.astype(str).str.strip()
-            
-            # Διόρθωση παρένθεσης εδώ (από ] σε ))
-            mask_pay = (
-                (df_pay['id_customer'].astype(str).str.strip() == str(c_id)) & 
-                (df_pay['school_year'].astype(str).str.strip() == str(school_year))
-            )
-            
-            if 'id' in df_pay.columns:
-                df_pay_filtered = df_pay[mask_pay].drop_duplicates(subset=['id'])
-            else:
-                df_pay_filtered = df_pay[mask_pay].drop_duplicates()
-                
-            total_paid = pd.to_numeric(df_pay_filtered['amount_paid'], errors='coerce').fillna(0).sum()
-
-        # 5. Τρέχον Υπόλοιπο (επιτρέπει αρνητικές τιμές για πιστωτικά/προπληρωμές)
-        current_xreos = total_lessons_cost - total_paid
-
-        # 6. Ενημέρωση του πεδίου xreos στη στήλη L (index 12) του db_registrations
-        sh_reg.update_cell(reg_row_idx, 12, current_xreos)
+        # Διαβάζουμε το τρέχον χρέος και τις προηγούμενες συνολικές πληρωμές
+        current_xreos = float(str(r_item.get('xreos', 0)).replace(',', '.') or 0.0)
+        current_total_paid = float(str(r_item.get('total_paid', 0)).replace(',', '.') or 0.0)
         
+        # 2. Αν έγινε νέα πληρωμή, την προσθέτουμε στις συνολικές πληρωμές και τη αφαιρούμε από το χρέος
+        if new_payment_amt > 0:
+            new_total_paid = current_total_paid + float(new_payment_amt)
+            new_xreos = current_xreos - float(new_payment_amt)
+            
+            # Βρίσκουμε σε ποιες στήλες βρίσκονται τα πεδία total_paid και xreos στο Google Sheet
+            cols = list(df_reg.columns)
+            xreos_col_idx = cols.index('xreos') + 1 if 'xreos' in cols else 12
+            total_paid_col_idx = cols.index('total_paid') + 1 if 'total_paid' in cols else 13 # Προσαρμόσε το αν η στήλη είναι αλλού
+            
+            # Ενημέρωση Google Sheet
+            sh_reg.update_cell(reg_row_idx, xreos_col_idx, new_xreos)
+            sh_reg.update_cell(reg_row_idx, total_paid_col_idx, new_total_paid)
+
     except Exception as e:
+        print(f"Error updating xreos: {e}")
         pass
 
 def generate_single_attendance_pdf(attendance_rows, date_str, school_year):
