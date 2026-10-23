@@ -102,48 +102,44 @@ def remove_accents(input_str):
     nfkd_form = unicodedata.normalize('NFKD', input_str)
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
-def update_customer_xreos(c_id, school_year, program, new_payment_amt=0.0):
+def update_customer_xreos(c_id, school_year, new_payment_amt=0.0):
     try:
         gc = get_gspread_client()
-        
-        # 1. Παίρνουμε τα δεδομένα από το db_registrations
         sh_reg = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
         regs_data = sh_reg.get_all_records()
         df_reg = pd.DataFrame(regs_data)
         df_reg.columns = df_reg.columns.astype(str).str.strip()
         
-        prog_col = next((c for c in df_reg.columns if c.lower() in ['program', 'δ', 'j', 'πρόγραμμα']), 'program')
-        
+        # Βρίσκουμε τη γραμμή του μαθητή αποκλειστικά με ID και Σχολικό Έτος
         mask_reg = (
             (df_reg['id_customer'].astype(str).str.strip() == str(c_id)) & 
-            (df_reg['school_year'].astype(str).str.strip() == str(school_year)) & 
-            (df_reg[prog_col].astype(str).str.strip().str.lower() == str(program).strip().lower())
+            (df_reg['school_year'].astype(str).str.strip() == str(school_year))
         )
         
         matched_regs = df_reg[mask_reg]
         if matched_regs.empty:
             return
             
-        reg_row_idx = matched_regs.index[0] + 2 # Google sheet row index
-        r_item = matched_regs.iloc[0]
-        
-        # Διαβάζουμε το τρέχον χρέος και τις προηγούμενες συνολικές πληρωμές
-        current_xreos = float(str(r_item.get('xreos', 0)).replace(',', '.') or 0.0)
-        current_total_paid = float(str(r_item.get('total_paid', 0)).replace(',', '.') or 0.0)
-        
-        # 2. Αν έγινε νέα πληρωμή, την προσθέτουμε στις συνολικές πληρωμές και την αφαιρούμε από το χρέος
-        if new_payment_amt > 0:
-            new_total_paid = current_total_paid + float(new_payment_amt)
-            new_xreos = current_xreos - float(new_payment_amt)
+        # Αν υπάρχουν πολλαπλές εγγραφές για τον ίδιο μαθητή, παίρνουμε την πρώτη ή κάνουμε loop σε όλες
+        for idx_row in matched_regs.index:
+            reg_row_idx = idx_row + 2 # Google Sheet row index
+            r_item = df_reg.iloc[idx_row]
             
-            # Στήλη L (12) για το xreos, Στήλη O (15) για το total_paid
-            sh_reg.update_cell(reg_row_idx, 12, new_xreos)
-            sh_reg.update_cell(reg_row_idx, 15, new_total_paid)
+            current_xreos = float(str(r_item.get('xreos', 0)).replace(',', '.') or 0.0)
+            current_total_paid = float(str(r_item.get('total_paid', 0)).replace(',', '.') or 0.0)
+            
+            if new_payment_amt > 0:
+                new_total_paid = current_total_paid + float(new_payment_amt)
+                new_xreos = current_xreos - float(new_payment_amt)
+                
+                # Στήλη L (12) για το xreos, Στήλη O (15) για το total_paid
+                sh_reg.update_cell(reg_row_idx, 12, new_xreos)
+                sh_reg.update_cell(reg_row_idx, 15, new_total_paid)
 
     except Exception as e:
         print(f"Error updating xreos: {e}")
         pass
-
+        
 def generate_single_attendance_pdf(attendance_rows, date_str, school_year):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
