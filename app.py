@@ -142,14 +142,13 @@ def update_customer_xreos(c_id, school_year, program):
             df_att = pd.DataFrame(att_data)
             df_att.columns = df_att.columns.astype(str).str.strip()
             
-            # Φιλτράρισμα για τον μαθητή και το έτος
+            # Διόρθωση παρένθεσης εδώ (από ] σε ))
             mask_att = (
                 (df_att['id_customer'].astype(str).str.strip() == str(c_id)) & 
                 (df_att['school_year'].astype(str).str.strip() == str(school_year)) & 
                 (df_att['status'].astype(str).str.strip().str.upper() == 'ΝΑΙ')
-            ])
+            )
             
-            # Αν υπάρχει στήλη ημερομηνίας, διασφαλίζουμε ότι δεν μετράμε διπλές εγγραφές της ίδιας μέρας
             if 'date' in df_att.columns:
                 df_att_filtered = df_att[mask_att].drop_duplicates(subset=['date', 'id_customer', 'school_year'])
             else:
@@ -160,19 +159,20 @@ def update_customer_xreos(c_id, school_year, program):
         # 3. Υπολογίζουμε το συνολικό κόστος μαθημάτων
         total_lessons_cost = total_nais * adj_cost
 
-        # 4. Αθροίζουμε όλες τις πληρωμές του μαθητή για το συγκεκριμένο έτος (χωρίς διπλομετρήσεις)
+        # 4. Αθροίζουμε όλες τις πληρωμές του μαθητή για το συγκεκριμένο έτος
         sh_pay = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
         pay_data = sh_pay.get_all_records()
         total_paid = 0.0
         if pay_data:
             df_pay = pd.DataFrame(pay_data)
             df_pay.columns = df_pay.columns.astype(str).str.strip()
+            
+            # Διόρθωση παρένθεσης εδώ (από ] σε ))
             mask_pay = (
                 (df_pay['id_customer'].astype(str).str.strip() == str(c_id)) & 
                 (df_pay['school_year'].astype(str).str.strip() == str(school_year))
-            ]
+            )
             
-            # Αν υπάρχει ID πληρωμής ή ημερομηνία+ποσό, αποτρέπουμε τυχόν διπλοαθροίσεις
             if 'id' in df_pay.columns:
                 df_pay_filtered = df_pay[mask_pay].drop_duplicates(subset=['id'])
             else:
@@ -180,11 +180,10 @@ def update_customer_xreos(c_id, school_year, program):
                 
             total_paid = pd.to_numeric(df_pay_filtered['amount_paid'], errors='coerce').fillna(0).sum()
 
-        # 5. Τρέχον Υπόλοιπο = (Συνολικά ΝΑΙ * adjusted_cost) - Συνολικές Πληρωμές
-        # (Επιτρέπονται κανονικά οι αρνητικές τιμές, π.χ. -10€, -20€ όταν υπάρχει προπληρωμή)
+        # 5. Τρέχον Υπόλοιπο (επιτρέπει αρνητικές τιμές για πιστωτικά/προπληρωμές)
         current_xreos = total_lessons_cost - total_paid
 
-        # 6. Ενημέρωση του πεδίου xreos στη στήλη L (index 12 / στήλη 12) του db_registrations
+        # 6. Ενημέρωση του πεδίου xreos στη στήλη L (index 12) του db_registrations
         sh_reg.update_cell(reg_row_idx, 12, current_xreos)
         
     except Exception as e:
