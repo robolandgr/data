@@ -1176,11 +1176,8 @@ else:
                                 rec = st.text_input("Αρ. Απόδειξης").strip()
                                 amt = st.number_input("Συνολικό Πσό Πληρωμής (€)", min_value=0.0, format="%.2f")
                                 
-                                # 👉 Επιλογή ενεργοποίησης χειροκίνητου ποσού έναντι
-                                is_extra_pay = st.checkbox("Καθορισμός ποσού έναντι")
-                                extra_amt = 0.0
-                                if is_extra_pay:
-                                    extra_amt = st.number_input("Ποσό Έναντι (€)", min_value=0.0, value=amt, format="%.2f")
+                                # 👉 Αυτόνομο πεδίο ποσού για το "Έναντι"
+                                extra_amt = st.number_input("Ποσό Έναντι (€)", min_value=0.0, format="%.2f")
                                 
                                 pay_method = st.selectbox("Τρόπος Πληρωμής", ["Μετρητά", "Εθνική", "Eurobank", "POS"])
                                 
@@ -1214,8 +1211,8 @@ else:
                                                 pay_method              # 9: pay_method
                                             ])
                                             
-                                            # Αν είναι επιλεγμένο, προσθέτουμε το καθορισμένο ποσό έναντι στη στήλη O (extra_pay)
-                                            if is_extra_pay and reg_row_index and extra_amt > 0:
+                                            # Αν συμπληρώθηκε ποσό έναντι (> 0), το προσθέτουμε αθροιστικά στη στήλη O (extra_pay)
+                                            if reg_row_index and extra_amt > 0:
                                                 sh_reg = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
                                                 reg_row_values = sh_reg.row_values(reg_row_index)
                                                 
