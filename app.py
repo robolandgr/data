@@ -140,16 +140,7 @@ def update_customer_xreos(c_id, school_year, program):
         except:
             adj_cost = 0.0
 
-        # 2. Extra Pay από τη Στήλη O (15η στήλη -> Index 14)
-        extra_pay_val = 0.0
-        try:
-            if len(r_item) >= 15:
-                extra_str = str(r_item[14]).replace(',', '.').strip()
-                extra_pay_val = float(extra_str) if extra_str else 0.0
-        except:
-            extra_pay_val = 0.0
-
-        # 3. Μετράμε τις συνολικές παρουσίες "ΝΑΙ" από το db_attendances
+        # 2. Μετράμε τις συνολικές παρουσίες "ΝΑΙ" από το db_attendances
         sh_att = gc.open(OLD_SHEET_NAME).worksheet("db_attendances")
         att_data = sh_att.get_all_records()
         total_nais = 0
@@ -162,10 +153,10 @@ def update_customer_xreos(c_id, school_year, program):
                 (df_att['status'].astype(str).str.strip().str.upper() == 'ΝΑΙ')
             ].shape[0]
 
-        # Συνολικό κόστος μαθημάτων βάσει παρουσιών
+        # Συνολικό κόστος μαθημάτων
         total_lessons_cost = total_nais * adj_cost
 
-        # 4. Αθροίζουμε τις κανονικές πληρωμές από το db_payments
+        # 3. Αθροίζουμε τις κανονικές πληρωμές από το db_payments
         sh_pay = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
         pay_data = sh_pay.get_all_records()
         total_paid = 0.0
@@ -178,22 +169,28 @@ def update_customer_xreos(c_id, school_year, program):
             )
             total_paid = pd.to_numeric(df_pay.loc[mask_pay, 'amount_paid'], errors='coerce').fillna(0).sum()
 
-        # 5. ΟΡΘΟΣ ΣΥΜΨΗΦΙΣΜΟΣ: 
-        # Συνολικό κόστος μείον (Πληρωμές + Extra Pay / Πορτοφόλι)
-        total_available_money = total_paid + extra_pay_val
-        current_xreos = total_lessons_cost - total_available_money
+        # 4. Αυτόματος υπολογισμός βάσει Επιλογής Β:
+        # Αν οι πληρωμές είναι μεγαλύτερες από το κόστος, το xreos γίνεται 0 και η διαφορά πάει στο extra_pay (Στήλη O).
+        # Αν το κόστος είναι μεγαλύτερο από τις πληρωμές, το xreos παίρνει τη διαφορά και το extra_pay γίνεται 0.
+        net_difference = total_lessons_cost - total_paid
 
-        # Αν τα χρήματα που έδωσε (πληρωμές + extra) είναι περισσότερα από το κόστος, 
-        # το χρέος μηδενίζεται (δεν γίνεται αρνητικό)
-        if current_xreos < 0:
+        if net_difference > 0:
+            current_xreos = net_difference
+            current_extra_pay = 0.0
+        else:
             current_xreos = 0.0
+            current_extra_pay = abs(net_difference) # Η υπερπληρωμή γίνεται αυτόματα extra_pay (πορτοφόλι)
 
-        # 6. Ενημέρωση του xreos στη στήλη L (12)
+        # 5. Ενημέρωση Google Sheet:
+        # Στήλη L (12) = xreos
+        # Στήλη O (15) = extra_pay
         sh_reg.update_cell(reg_row_idx, 12, current_xreos)
+        sh_reg.update_cell(reg_row_idx, 15, current_extra_pay)
         
     except Exception as e:
         print(f"Error in update_customer_xreos: {e}")
         pass
+        
 def generate_single_attendance_pdf(attendance_rows, date_str, school_year):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
@@ -1199,7 +1196,7 @@ else:
                                 amt = st.number_input("Συνολικό Πσό Πληρωμής (€)", min_value=0.0, format="%.2f")
                                 
                                 # 👉 Αυτόνομο πεδίο ποσού για το "Έναντι"
-                                extra_amt = st.number_input("Ποσό Έναντι (€)", min_value=0.0, format="%.2f")
+                                # extra_amt = st.number_input("Ποσό Έναντι (€)", min_value=0.0, format="%.2f")
                                 
                                 pay_method = st.selectbox("Τρόπος Πληρωμής", ["Μετρητά", "Εθνική", "Eurobank", "POS"])
                                 
