@@ -561,7 +561,7 @@ else:
                     st.session_state.page = "pre_register_page"
                     st.rerun()
  #----------------------------------------------------------------------   
-    # --- ΣΕΛΙΔΑ: ΠΑΡΟΥΣΙΟΛΟΓΙΟ (ΤΜΗΜΑ: ΙΔΙΩΤΙΚΑ) ---
+   # --- ΣΕΛΙΔΑ: ΠΑΡΟΥΣΙΟΛΟΓΙΟ (ΤΜΗΜΑ: ΙΔΙΩΤΙΚΑ) ---
     elif st.session_state.page == "attendances_page":
         if st.button("⬅️ Μενού", use_container_width=True): 
             st.session_state.page = "menu"
@@ -675,13 +675,10 @@ else:
 
                             for c_id, data in rows_to_append_or_update:
                                 found_att = False
-                                already_had_nai = False  # Έλεγχος αν είχε ήδη ΝΑΙ στη βάση για σήμερα
                                 
                                 if att_records:
                                     for ai, a_row in enumerate(att_records, start=2):
                                         if str(a_row.get('id_customer', '')).strip() == c_id and str(a_row.get('date', '')).strip() == target_date_str and str(a_row.get('school_year', '')).strip() == selected_year_att:
-                                            if str(a_row.get('status', '')).strip().upper() == 'ΝΑΙ':
-                                                already_had_nai = True
                                             sh_att.update_cell(ai, 6, "ΝΑΙ")
                                             found_att = True
                                             break
@@ -690,24 +687,10 @@ else:
                                     sh_att.append_row([next_att_id, c_id, f"{data['lname']} {data['fname']}", selected_year_att, target_date_str, "ΝΑΙ"])
                                     next_att_id += 1
 
-                                # Υπολογισμός χρέους ΜΟΝΟ αν ο μαθητής ΔΕΝ είχε ήδη καταχωρηθεί ως ΝΑΙ σήμερα
-                                if not already_had_nai:
-                                    r_idx = data['reg_row_index']
-                                    reg_row_data = all_reg_values[r_idx - 1]
-                                    
-                                    energy_type = str(reg_row_data[10]).strip() if len(reg_row_data) > 10 else ""
-                                    
-                                    if energy_type.lower() == "ανοιχτή πληρωμή":
-                                        current_xreos = 0.0
-                                        try:
-                                            current_xreos = float(str(reg_row_data[11]).replace(',', '.') or 0.0)
-                                        except:
-                                            current_xreos = 0.0
+                                # 🌟 ΚΛΗΣΗ ΤΗΣ ΚΕΝΤΡΙΚΗΣ ΣΥΝΑΡΤΗΣΗΣ ΥΠΟΛΟΓΙΣΜΟΥ (ΑΥΤΟΜΑΤΟΣ ΣΥΜΨΗΦΙΣΜΟΣ ΜΕ EXTRA PAY)
+                                update_customer_xreos(c_id, selected_year_att, data['prog'])
 
-                                        new_xreos = current_xreos + data['adj_cost']
-                                        sh_reg.update_cell(r_idx, 12, new_xreos)
-
-                            st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε επιτυχώς (χωρίς διπλοχρεώσεις)!")
+                            st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε επιτυχώς και τα οικονομικά ενημερώθηκαν!")
                             time.sleep(1.2)
                             st.rerun()
                         except Exception as e:
