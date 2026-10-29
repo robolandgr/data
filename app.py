@@ -739,7 +739,7 @@ else:
                     sel_reg = st.selectbox("Επιλογή εγγραφής", user_regs['display_reg'].tolist())
                     reg_to_edit = user_regs[user_regs['display_reg'] == sel_reg].iloc[0]
                 
-                s_year = st.selectbox("📅 Σχολικό Έτος", [f"{y}-{y+1}" for y in range(2026, 2030)])
+                s_year = st.selectbox("📅 Σχολικό Έτος", [f"{y}-{y+1}" for y in range(2024, 2030)])
                 prog_list = progs_df['program_name'].tolist() if not progs_df.empty else []
                 s_prog = st.selectbox("📚 Πρόγραμμα", options=prog_list)
                 
@@ -1566,7 +1566,7 @@ else:
                 new_class_name = st.text_input("Όνομα Τμήματος").strip()
                 sel_prog_for_class = st.selectbox("📚 Επιλογή Προγράμματος", options=prog_options if prog_options else ["-- Κανένα Πρόγραμμα --"])
                 
-                year_options = [f"{y}-{y+1}" for y in range(2026, 2030)]
+                year_options = [f"{y}-{y+1}" for y in range(2024, 2030)]
                 sel_year_for_class = st.selectbox("📅 Σχολικό Έτος", options=year_options)
                 
                 if st.form_submit_button("💾 Αποθήκευση Τμήματος"):
@@ -1627,7 +1627,7 @@ else:
                 cur_year = str(class_to_edit[col_year]).strip()
                 
                 prog_idx = prog_options.index(cur_prog) if cur_prog in prog_options else 0
-                year_options = [f"{y}-{y+1}" for y in range(2026, 2030)]
+                year_options = [f"{y}-{y+1}" for y in range(2024, 2030)]
                 year_idx = year_options.index(cur_year) if cur_year in year_options else 0
 
                 with st.form("edit_class_form"):
