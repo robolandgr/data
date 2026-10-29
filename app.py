@@ -135,7 +135,7 @@ def update_customer_xreos(c_id, school_year, program):
         except:
             adj_cost = 0.0
 
-        # Παίρνουμε το τρέχον extra_pay από τη στήλη O (15)
+        # Παίρνουμε το extra_pay από τη στήλη O (15)
         extra_pay_val = 0.0
         try:
             extra_raw = str(r_item.get('extra_pay', 0)).replace(',', '.')
@@ -172,15 +172,18 @@ def update_customer_xreos(c_id, school_year, program):
             )
             total_paid = pd.to_numeric(df_pay.loc[mask_pay, 'amount_paid'], errors='coerce').fillna(0).sum()
 
-        # 5. Υπολογισμός Χρέους με συμψηφισμό του extra_pay (πορτοφόλι προπληρωμής)
-        # Το συνολικό κόστος μειώνεται πρώτα από το extra_pay και τις συνολικές πληρωμές
-        remaining_cost = total_lessons_cost - total_paid
+        # 5. Ορθός υπολογισμός με προτεραιότητα στο extra_pay (δεξαμενή)
+        # Πρώτα αφαιρούμε το extra_pay από το κόστος των μαθημάτων
+        cost_after_extra = total_lessons_cost - extra_pay_val
         
-        # Αν υπάρχει extra_pay, απορροφά το κόστος
-        current_xreos = remaining_cost - extra_pay_val
-        
-        # Αν το extra_pay είναι μεγαλύτερο από το χρέος, το xreos μηδενίζεται
-        # (ή αν θες να κρατάει πιστωτικό, το αφήνεις ως έχει. Συνήθως το xreos σταματάει στο 0 όταν υπάρχει κάλυψη)
+        # Αν το extra_pay είναι μικρότερο από το κόστος, το υπόλοιπο μειώνεται με τις κανονικές πληρωμές
+        if cost_after_extra > 0:
+            current_xreos = cost_after_extra - total_paid
+        else:
+            # Αν το extra_pay υπερκαλύπτει τα μαθήματα, αφαιρούμε και τις πληρωμές από το αρνητικό υπόλοιπο (ή το μηδενίζουμε αν δεν θες πιστωτικό)
+            current_xreos = cost_after_extra - total_paid
+
+        # Αν θέλεις το χρέος να μην πέφτει κάτω από 0 (εφόσον το extra_pay καλύπτει τα πάντα):
         if current_xreos < 0:
             current_xreos = 0.0
 
