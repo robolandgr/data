@@ -1174,6 +1174,7 @@ else:
                             
                             adjusted_val = 0.0
                             xreos_val = 0.0
+                            extra_pay_val = 0.0
                             
                             if not current_reg.empty:
                                 r_item = current_reg.iloc[0]
@@ -1187,7 +1188,13 @@ else:
                                 try: xreos_val = float(xreos_str) if xreos_str.strip() != '' else 0.0
                                 except: xreos_val = 0.0
     
-                            st.info(f"💰 **Συμφωνηθέν Ποσό:** {adjusted_val:.2f}€ | 📉 **Υπόλοιπο:** {xreos_val:.2f}€")
+                                # Ανάγνωση του extra_pay από τη στήλη O (index 14)
+                                extra_raw = r_item.iloc[14] if len(r_item) > 14 else r_item.get('extra_pay', 0)
+                                extra_str = str(extra_raw).replace(',', '.')
+                                try: extra_pay_val = float(extra_str) if extra_str.strip() != '' else 0.0
+                                except: extra_pay_val = 0.0
+    
+                            st.info(f"💰 **Συμφωνηθέν Ποσό:** {adjusted_val:.2f}€ | 📉 **Υπόλοιπο:** {xreos_val:.2f}€ | 👛 **Πορτοφόλι (Extra):** {extra_pay_val:.2f}€")
     
                             with st.form("pay"):
                                 rec = st.text_input("Αρ. Απόδειξης").strip()
