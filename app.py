@@ -1155,9 +1155,12 @@ else:
                             
                             adjusted_val = 0.0
                             xreos_val = 0.0
+                            reg_row_index = None
                             
                             if not current_reg.empty:
                                 r_item = current_reg.iloc[0]
+                                reg_row_index = current_reg.index[0] + 2 # Google Sheets row index
+                                
                                 adj_str = str(r_item.get('adjusted_cost', 0)).replace(',', '.')
                                 try: adjusted_val = float(adj_str) if adj_str.strip() != '' else 0.0
                                 except: adjusted_val = 0.0
@@ -1172,6 +1175,10 @@ else:
                             with st.form("pay"):
                                 rec = st.text_input("Αρ. Απόδειξης").strip()
                                 amt = st.number_input("Ποσό (€)", min_value=0.0, format="%.2f")
+                                
+                                # 👉 Νέα επιλογή για "Έναντι πληρωμή"
+                                is_extra_pay = st.checkbox("Έναντι πληρωμή")
+                                
                                 pay_method = st.selectbox("Τρόπος Πληρωμής", ["Μετρητά", "Εθνική", "Eurobank", "POS"])
                                 
                                 if st.form_submit_button("💾 Αποθήκευση"):
@@ -1193,17 +1200,34 @@ else:
                                                     nid = max(ids) + 1
                             
                                             sh.append_row([
-                                                nid,                            # 1: id_payment
-                                                int(c_id),                      # 2: id_customer
+                                                nid,                    # 1: id_payment
+                                                int(c_id),              # 2: id_customer
                                                 str(row['customer_lastname']),    # 3: customer_lastname
                                                 str(row['customer_firstname']),   # 4: customer_firstname
                                                 datetime.today().strftime('%Y-%m-%d'), # 5: payment_date
-                                                rec,                            # 6: receipt_number
-                                                amt,                            # 7: amount_paid
-                                                str(yr),                        # 8 (Στήλη H): school_year
-                                                pay_method                      # 9: pay_method
+                                                rec,                    # 6: receipt_number
+                                                amt,                    # 7: amount_paid
+                                                str(yr),                # 8 (Στήλη H): school_year
+                                                pay_method              # 9: pay_method
                                             ])
                                             
+                                            # Αν είναι επιλεγμένο το "Έναντι πληρωμή", ενημερώνουμε τη στήλη O (extra_pay) στο db_registrations
+                                            if is_extra_pay and reg_row_index:
+                                                sh_reg = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
+                                                reg_row_values = sh_reg.row_values(reg_row_index)
+                                                
+                                                # Η στήλη O είναι η 15η στήλη. Παίρνουμε την τρέχουσα τιμή αν υπάρχει
+                                                curr_extra = 0.0
+                                                if len(reg_row_values) >= 15:
+                                                    extra_str = str(reg_row_values[14]).replace(',', '.').strip()
+                                                    try:
+                                                        curr_extra = float(extra_str) if extra_str else 0.0
+                                                    except:
+                                                        curr_extra = 0.0
+                                                
+                                                new_extra = curr_extra + float(amt)
+                                                sh_reg.update_cell(reg_row_index, 15, new_extra) # Στήλη O = 15
+
                                             update_customer_xreos(c_id, yr, prog)
                                             
                                             st.success("✅ Η πληρωμή καταχωρήθηκε επιτυχώς!")
@@ -1212,6 +1236,7 @@ else:
                                         except Exception as e:
                                             st.error(f"Σφάλμα κατά την αποθήκευση: {e}")
 
+    
     # --- ΣΕΛΙΔΑ: ΑΝΑΦΟΡΑ & ΙΣΤΟΡΙΚΟ ΠΛΗΡΩΜΩΝ ΜΑΘΗΤΗ ---
     elif st.session_state.page == "payment_history_report":
         if st.button("⬅️ Μενού", use_container_width=True): 
