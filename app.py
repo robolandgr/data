@@ -1174,10 +1174,13 @@ else:
 
                             with st.form("pay"):
                                 rec = st.text_input("Αρ. Απόδειξης").strip()
-                                amt = st.number_input("Ποσό (€)", min_value=0.0, format="%.2f")
+                                amt = st.number_input("Συνολικό Πσό Πληρωμής (€)", min_value=0.0, format="%.2f")
                                 
-                                # 👉 Νέα επιλογή για "Έναντι πληρωμή"
-                                is_extra_pay = st.checkbox("Έναντι πληρωμή")
+                                # 👉 Επιλογή ενεργοποίησης χειροκίνητου ποσού έναντι
+                                is_extra_pay = st.checkbox("Καθορισμός ποσού έναντι")
+                                extra_amt = 0.0
+                                if is_extra_pay:
+                                    extra_amt = st.number_input("Ποσό Έναντι (€)", min_value=0.0, value=amt, format="%.2f")
                                 
                                 pay_method = st.selectbox("Τρόπος Πληρωμής", ["Μετρητά", "Εθνική", "Eurobank", "POS"])
                                 
@@ -1211,12 +1214,11 @@ else:
                                                 pay_method              # 9: pay_method
                                             ])
                                             
-                                            # Αν είναι επιλεγμένο το "Έναντι πληρωμή", ενημερώνουμε τη στήλη O (extra_pay) στο db_registrations
-                                            if is_extra_pay and reg_row_index:
+                                            # Αν είναι επιλεγμένο, προσθέτουμε το καθορισμένο ποσό έναντι στη στήλη O (extra_pay)
+                                            if is_extra_pay and reg_row_index and extra_amt > 0:
                                                 sh_reg = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
                                                 reg_row_values = sh_reg.row_values(reg_row_index)
                                                 
-                                                # Η στήλη O είναι η 15η στήλη. Παίρνουμε την τρέχουσα τιμή αν υπάρχει
                                                 curr_extra = 0.0
                                                 if len(reg_row_values) >= 15:
                                                     extra_str = str(reg_row_values[14]).replace(',', '.').strip()
@@ -1225,7 +1227,7 @@ else:
                                                     except:
                                                         curr_extra = 0.0
                                                 
-                                                new_extra = curr_extra + float(amt)
+                                                new_extra = curr_extra + float(extra_amt)
                                                 sh_reg.update_cell(reg_row_index, 15, new_extra) # Στήλη O = 15
 
                                             update_customer_xreos(c_id, yr, prog)
