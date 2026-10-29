@@ -162,7 +162,7 @@ def update_customer_xreos(c_id, school_year, program):
                 (df_att['status'].astype(str).str.strip().str.upper() == 'ΝΑΙ')
             ].shape[0]
 
-        # Συνολικό κόστος μαθημάτων βάσει των παρουσιών
+        # Συνολικό κόστος μαθημάτων βάσει παρουσιών
         total_lessons_cost = total_nais * adj_cost
 
         # 4. Αθροίζουμε τις κανονικές πληρωμές από το db_payments
@@ -178,12 +178,13 @@ def update_customer_xreos(c_id, school_year, program):
             )
             total_paid = pd.to_numeric(df_pay.loc[mask_pay, 'amount_paid'], errors='coerce').fillna(0).sum()
 
-        # 5. Η ΔΙΟΡΘΩΣΗ ΕΔΩ: 
-        # Πρώτα αφαιρούμε το extra_pay από το κόστος των μαθημάτων, και μετά τις πληρωμές
-        cost_after_extra = total_lessons_cost - extra_pay_val
-        current_xreos = cost_after_extra - total_paid
+        # 5. ΟΡΘΟΣ ΣΥΜΨΗΦΙΣΜΟΣ: 
+        # Συνολικό κόστος μείον (Πληρωμές + Extra Pay / Πορτοφόλι)
+        total_available_money = total_paid + extra_pay_val
+        current_xreos = total_lessons_cost - total_available_money
 
-        # Αν το extra_pay υπερκαλύπτει τα πάντα, το χρέος δεν πέφτει κάτω από 0
+        # Αν τα χρήματα που έδωσε (πληρωμές + extra) είναι περισσότερα από το κόστος, 
+        # το χρέος μηδενίζεται (δεν γίνεται αρνητικό)
         if current_xreos < 0:
             current_xreos = 0.0
 
@@ -193,7 +194,6 @@ def update_customer_xreos(c_id, school_year, program):
     except Exception as e:
         print(f"Error in update_customer_xreos: {e}")
         pass
-
 def generate_single_attendance_pdf(attendance_rows, date_str, school_year):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
