@@ -107,29 +107,19 @@ def update_customer_xreos(c_id, school_year, program):
         gc = get_gspread_client()
         sh_reg = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
         
-        # Παίρνουμε όλες τις γραμμές σαν λίστες (όχι λεξικά), ώστε να δουλεύουμε με δείκτες στηλών
         all_rows = sh_reg.get_all_values()
         if len(all_rows) < 2:
             return
             
         header = [str(c).strip() for c in all_rows[0]]
         
-        # Εντοπισμός θέσης ID και Έτους στις κεφαλίδες
         id_col_idx = header.index('id_customer') if 'id_customer' in header else 1
         year_col_idx = header.index('school_year') if 'school_year' in header else 7
         
-        # Εντοπισμός στήλης προγράμματος
-        prog_col_idx = -1
-        for idx, col_name in enumerate(header):
-            if col_name.lower() in ['program', 'δ', 'j', 'πρόγραμμα']:
-                prog_col_idx = idx
-                break
-
-        # 1. Βρίσκουμε τη σωστή γραμμή του μαθητή στο db_registrations
         reg_row_idx = None
         r_item = None
         
-        for idx, row in enumerate(all_rows[1:], start=2): # start=2 για τα Google Sheets rows
+        for idx, row in enumerate(all_rows[1:], start=2):
             row_id = str(row[id_col_idx]).strip() if len(row) > id_col_idx else ""
             row_year = str(row[year_col_idx]).strip() if len(row) > year_col_idx else ""
             
@@ -138,19 +128,10 @@ def update_customer_xreos(c_id, school_year, program):
                 r_item = row
                 break
                 
-        # Αν δεν βρέθηκε με έτος, δοκιμάζουμε μόνο με ID
-        if not reg_row_idx:
-            for idx, row in enumerate(all_rows[1:], start=2):
-                row_id = str(row[id_col_idx]).strip() if len(row) > id_col_idx else ""
-                if row_id == str(c_id).strip():
-                    reg_row_idx = idx
-                    r_item = row
-                    break
-                    
         if not reg_row_idx or not r_item:
             return
 
-        # 2. Διαβάζουμε το adjusted_cost (συνήθως στήλη J ή κοντά, το ψάχνουμε με ασφάλεια)
+        # 1. Adjusted Cost
         adj_cost = 0.0
         try:
             adj_idx = header.index('adjusted_cost') if 'adjusted_cost' in header else 9
@@ -159,16 +140,19 @@ def update_customer_xreos(c_id, school_year, program):
         except:
             adj_cost = 0.0
 
-        # 3. Διαβάζουμε το extra_pay από τη Στήλη O (15η στήλη -> index 14 στη λίστα)
+        # 2. Extra Pay (Στήλη O = 15η στήλη -> Index 14)
         extra_pay_val = 0.0
         try:
             if len(r_item) >= 15:
-                extra_str = str(r_item[14]).replace(',', '.').strip() # Index 14 = Στήλη O
+                extra_str = str(r_item[14]).replace(',', '.').strip()
                 extra_pay_val = float(extra_str) if extra_str else 0.0
         except:
             extra_pay_val = 0.0
 
-        # 4. Μετράμε τις συνολικές παρουσίες "ΝΑΙ" από το db_attendances
+        # ---- DEBUG: Τυπώνει στην οθόνη για να δούμε τι διαβάζει ακριβώς ----
+        st.write(f"🔍 DEBUG -> Εντοπίστηκε Extra Pay στη στήλη O: {extra_pay_val}")
+
+        # 3. Παρουσίες ΝΑΙ
         sh_att = gc.open(OLD_SHEET_NAME).worksheet("db_attendances")
         att_data = sh_att.get_all_records()
         total_nais = 0
@@ -181,10 +165,9 @@ def update_customer_xreos(c_id, school_year, program):
                 (df_att['status'].astype(str).str.strip().str.upper() == 'ΝΑΙ')
             ].shape[0]
 
-        # Συνολικό κόστος μαθημάτων
         total_lessons_cost = total_nais * adj_cost
 
-        # 5. Αθροίζουμε όλες τις κανονικές πληρωμές του μαθητή για το έτος
+        # 4. Πληρωμές
         sh_pay = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
         pay_data = sh_pay.get_all_records()
         total_paid = 0.0
@@ -197,22 +180,17 @@ def update_customer_xreos(c_id, school_year, program):
             )
             total_paid = pd.to_numeric(df_pay.loc[mask_pay, 'amount_paid'], errors='coerce').fillna(0).sum()
 
-        # 6. Ορθός συμψηφισμός: Κόστος -> Μείον Extra Pay -> Μείον Κανονικές Πληρωμές
+        # 5. Τελικός Υπολογισμός
         cost_after_extra = total_lessons_cost - extra_pay_val
-        
-        if cost_after_extra > 0:
-            current_xreos = cost_after_extra - total_paid
-        else:
-            current_xreos = cost_after_extra - total_paid
+        current_xreos = cost_after_extra - total_paid
 
         if current_xreos < 0:
             current_xreos = 0.0
 
-        # 7. Ενημέρωση του xreos στη στήλη L (12) του db_registrations
         sh_reg.update_cell(reg_row_idx, 12, current_xreos)
         
     except Exception as e:
-        print(f"Error in update_customer_xreos: {e}")
+        st.error(f"Σφάλμα στη συνάρτηση: {e}")
         pass
 
 def generate_single_attendance_pdf(attendance_rows, date_str, school_year):
