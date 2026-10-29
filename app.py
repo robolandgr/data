@@ -106,7 +106,7 @@ def update_customer_xreos(c_id, school_year, program):
     try:
         gc = get_gspread_client()
         
-        # 1. Παίρνουμε το adjusted_cost από το db_registrations
+        # 1. Παίρνουμε τα δεδομένα από το db_registrations
         sh_reg = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
         regs_data = sh_reg.get_all_records()
         df_reg = pd.DataFrame(regs_data)
@@ -127,6 +127,7 @@ def update_customer_xreos(c_id, school_year, program):
         reg_row_idx = matched_regs.index[0] + 2 # Google sheet row index
         r_item = matched_regs.iloc[0]
         
+        # Παίρνουμε το adjusted_cost
         adj_cost = 0.0
         try:
             adj_str = str(r_item.get('adjusted_cost', 0)).replace(',', '.')
@@ -134,7 +135,15 @@ def update_customer_xreos(c_id, school_year, program):
         except:
             adj_cost = 0.0
 
-        # 2. Μετράμε τις συνολικές παρουσίες "ΝΑΙ" από το db_attendances για το συγκεκριμένο έτος
+        # Παίρνουμε το τρέχον extra_pay από τη στήλη O (15)
+        extra_pay_val = 0.0
+        try:
+            extra_raw = str(r_item.get('extra_pay', 0)).replace(',', '.')
+            extra_pay_val = float(extra_raw) if extra_raw.strip() != '' else 0.0
+        except:
+            extra_pay_val = 0.0
+
+        # 2. Μετράμε τις συνολικές παρουσίες "ΝΑΙ" από το db_attendances
         sh_att = gc.open(OLD_SHEET_NAME).worksheet("db_attendances")
         att_data = sh_att.get_all_records()
         total_nais = 0
@@ -150,7 +159,7 @@ def update_customer_xreos(c_id, school_year, program):
         # 3. Υπολογίζουμε το συνολικό κόστος μαθημάτων
         total_lessons_cost = total_nais * adj_cost
 
-        # 4. Αθροίζουμε όλες τις πληρωμές του μαθητή για το συγκεκριμένο έτος
+        # 4. Αθροίζουμε όλες τις κανονικές πληρωμές του μαθητή για το έτος
         sh_pay = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
         pay_data = sh_pay.get_all_records()
         total_paid = 0.0
@@ -163,13 +172,23 @@ def update_customer_xreos(c_id, school_year, program):
             )
             total_paid = pd.to_numeric(df_pay.loc[mask_pay, 'amount_paid'], errors='coerce').fillna(0).sum()
 
-        # 5. Τρέχον Χρέος = (Συνολικά ΝΑΙ * adjusted_cost) - Συνολικές Πληρωμές
-        current_xreos = max(0.0, total_lessons_cost - total_paid)
+        # 5. Υπολογισμός Χρέους με συμψηφισμό του extra_pay (πορτοφόλι προπληρωμής)
+        # Το συνολικό κόστος μειώνεται πρώτα από το extra_pay και τις συνολικές πληρωμές
+        remaining_cost = total_lessons_cost - total_paid
+        
+        # Αν υπάρχει extra_pay, απορροφά το κόστος
+        current_xreos = remaining_cost - extra_pay_val
+        
+        # Αν το extra_pay είναι μεγαλύτερο από το χρέος, το xreos μηδενίζεται
+        # (ή αν θες να κρατάει πιστωτικό, το αφήνεις ως έχει. Συνήθως το xreos σταματάει στο 0 όταν υπάρχει κάλυψη)
+        if current_xreos < 0:
+            current_xreos = 0.0
 
-        # 6. Ενημέρωση του πεδίου xreos στη στήλη L (index 12 / στήλη 12) του db_registrations
+        # 6. Ενημέρωση του πεδίου xreos στη στήλη L (12) του db_registrations
         sh_reg.update_cell(reg_row_idx, 12, current_xreos)
         
     except Exception as e:
+        print(f"Error in update_customer_xreos: {e}")
         pass
 
 def generate_single_attendance_pdf(attendance_rows, date_str, school_year):
