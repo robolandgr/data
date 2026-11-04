@@ -656,42 +656,75 @@ else:
                         with st.spinner("⏳ Αποθήκευση παρουσιολογίου και ενημέρωση οικονομικών..."):
                             try:
                                 gc = get_gspread_client()
+                                sh = gc.open(OLD_SHEET_NAME)
                                 
                                 try:
-                                    sh_att = gc.open(OLD_SHEET_NAME).worksheet("db_attendances")
+                                    sh_att = sh.worksheet("db_attendances")
                                 except:
-                                    sh_att = gc.open(OLD_SHEET_NAME).add_worksheet(title="db_attendances", rows="1000", cols="10")
+                                    sh_att = sh.add_worksheet(title="db_attendances", rows="1000", cols="10")
                                     sh_att.append_row(["id_attendance", "id_customer", "student_name", "school_year", "date", "status"])
-
-                                att_records = sh_att.get_all_records()
-                                next_att_id = int(pd.DataFrame(att_records)['id_attendance'].max()) + 1 if att_records and 'id_attendance' in pd.DataFrame(att_records).columns else 1
+                    
+                                att_data = sh_att.get_all_values() # Παίρνουμε όλα τα δεδομένα ως λίστα λιστών για ασφαλή διαγραφή γραμμής
                                 
+                                # Βρίσκουμε το επόμενο διαθέσιμο ID
+                                next_att_id = 1
+                                if len(att_data) > 1:
+                                    try:
+                                        df_existing = pd.DataFrame(att_data[1:], columns=att_data[0])
+                                        if 'id_attendance' in df_existing.columns and not df_existing['id_attendance'].empty:
+                                            next_att_id = int(pd.to_numeric(df_existing['id_attendance'], errors='coerce').max()) + 1
+                                    except:
+                                        next_att_id = len(att_data)
+                    
                                 updated_customers_to_calc = set()
-
+                    
                                 for c_id, data in attendance_inputs.items():
-                                    if data['val']:
-                                        found_att = False
-                                        if att_records:
-                                            for ai, a_row in enumerate(att_records, start=2):
-                                                if str(a_row.get('id_customer', '')).strip() == c_id and str(a_row.get('date', '')).strip() == target_date_str and str(a_row.get('school_year', '')).strip() == selected_year_att:
-                                                    sh_att.update_cell(ai, 6, "ΝΑΙ")
-                                                    found_att = True
+                                    status_val = data['val'] # "ΝΑΙ", "ΟΧΙ" ή κενό
+                                    
+                                    # Αναζήτηση αν υπάρχει ήδη καταχώρηση στη βάση
+                                    row_index_to_delete = None
+                                    row_index_to_update = None
+                                    
+                                    if len(att_data) > 1:
+                                        for idx, a_row in enumerate(att_data[1:], start=2): # Start from 2
+                                            # a_row: [id_attendance, id_customer, student_name, school_year, date, status]
+                                            if len(a_row) >= 5:
+                                                row_c_id = str(a_row[1]).strip()
+                                                row_year = str(a_row[3]).strip()
+                                                row_date = str(a_row[4]).strip()
+                                                
+                                                if row_c_id == str(c_id) and row_date == target_date_str and row_year == selected_year_att:
+                                                    row_index_to_update = idx
                                                     break
-                                        if not found_att:
+                    
+                                    if status_val == "ΝΑΙ":
+                                        if row_index_to_update:
+                                            # Αν υπάρχει ήδη, ενημερώνουμε το status σε ΝΑΙ
+                                            sh_att.update_cell(row_index_to_update, 6, "ΝΑΙ")
+                                        else:
+                                            # Αν δεν υπάρχει, προσθέτουμε νέα γραμμή
                                             sh_att.append_row([next_att_id, c_id, f"{data['lname']} {data['fname']}", selected_year_att, target_date_str, "ΝΑΙ"])
                                             next_att_id += 1
-                                        
-                                        updated_customers_to_calc.add((c_id, data['prog']))
-
-                                # Υπολογισμός οικονομικών ΜΕΤΑ την αποθήκευση των παρουσιών για κάθε επηρεαζόμενο μαθητή
+                                    elif status_val == "ΟΧΙ" or not status_val:
+                                        # Αν επιλέξει ΟΧΙ ή το ξετικάρει, ΔΙΑΓΡΑΦΟΥΜΕ τελείως τη γραμμή αν υπήρχε
+                                        if row_index_to_update:
+                                            sh_att.delete_rows(row_index_to_update)
+                                            # Ανανεώνουμε τα τοπικά δεδομένα `att_data` ώστε να μη χαθούν ταIndexes επόμενων γραμμών
+                                            att_data = sh_att.get_all_values()
+                    
+                                    updated_customers_to_calc.add((c_id, data['prog']))
+                    
+                                # Υπολογισμός οικονομικών μετά την ενημέρωση/διαγραφή
                                 for c_id, prog_name in updated_customers_to_calc:
                                     update_customer_xreos(c_id, selected_year_att, prog_name)
-
-                                st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε επιτυχώς και τα οικονομικά ενημερώθηκαν!")
+                    
+                                st.success("✅ Το παρουσιολόγιο ενημερώθηκε και τα οικονομικά υπολογίστηκαν ξανά σωστά!")
                                 time.sleep(1.0)
                                 st.rerun()
+                                
                             except Exception as e:
-                                st.error(f"Σφάλμα αποθήκευσης παρουσιών: {e}")
+                                st.error(f"Σφάλμα αποθήκευσης παρουσιών: προσπαθήστε ξανά. ({e})")
+                                
                 st.markdown("<br>", unsafe_allow_html=True)
                 pdf_bytes = generate_single_attendance_pdf(pdf_preview_rows, target_date_str, selected_year_att)
                 if pdf_bytes:
