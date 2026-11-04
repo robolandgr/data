@@ -579,7 +579,6 @@ else:
         target_date_str = selected_date_obj.strftime('%Y-%m-%d')
         st.info(f"Επιλεγμένη Ημερομηνία Καταγραφής: **{target_date_str}** | Σχολικό Έτος: **{selected_year_att}**")
 
-        # Γρήγορη φόρτωση δεδομένων μία φορά
         regs_df = load_specific_db("db_registrations")
         cust_df = load_specific_db("db_customers")
         att_df = load_specific_db("db_attendances")
@@ -657,12 +656,12 @@ else:
                         })
 
                     if st.form_submit_button("💾 Αποθήκευση Παρουσιολογίου"):
-                        with st.spinner("⏳ Αποθήκευση παρουσιολογίου και άμεσος υπολογισμός οικονομικών..."):
+                        with st.spinner("⏳ Αποθήκευση και ασφαλής ενημέρωση οικονομικών..."):
                             try:
                                 gc = get_gspread_client()
                                 sh = gc.open(OLD_SHEET_NAME)
                                 
-                                # 1. Ενημέρωση db_attendances
+                                # 1. Ενημέρωση db_attendances με batch
                                 try:
                                     sh_att = sh.worksheet("db_attendances")
                                 except:
@@ -714,8 +713,7 @@ else:
                                     for r_idx in sorted(rows_to_delete, reverse=True):
                                         sh_att.delete_rows(r_idx)
 
-                                # 2. Ενημέρωση οικονομικών (Xreos) για όλους τους μαθητές μαζικά
-                                time.sleep(0.5) # Μικρή παύση για συγχρονισμό του Google Sheet
+                                # 2. Υπολογισμός και ενημέρωση οικονομικών (Xreos) με batch updates για αποφυγή API limits
                                 updated_att_df = pd.DataFrame(sh_att.get_all_values()[1:], columns=sh_att.get_all_values()[0])
                                 updated_att_df.columns = updated_att_df.columns.astype(str).str.strip()
 
@@ -729,13 +727,14 @@ else:
                                 xreos_col = reg_header.index('xreos') if 'xreos' in reg_header else 11
                                 extra_col = reg_header.index('extra_pay') if 'extra_pay' in reg_header else 14
 
+                                batch_update_cells = []
+
                                 for r_i, r_val in enumerate(reg_all_values[1:], start=2):
                                     if len(r_val) > max(id_c_col, yr_col):
                                         row_cust_id = str(r_val[id_c_col]).strip()
                                         row_year = str(r_val[yr_col]).strip()
                                         
                                         if row_year == str(selected_year_att):
-                                            # Υπολογισμός συνολικών ΝΑΙ για τον μαθητή
                                             cust_nais = 0
                                             if not updated_att_df.empty and 'id_customer' in updated_att_df.columns:
                                                 cust_nais = updated_att_df[
@@ -752,7 +751,6 @@ else:
 
                                             total_lessons_cost = cust_nais * adj_c
 
-                                            # Υπολογισμός πληρωμών
                                             total_paid = 0.0
                                             if not pay_df.empty and 'id_customer' in pay_df.columns:
                                                 mask_p = (
@@ -765,12 +763,16 @@ else:
                                             new_xreos = max(0.0, net_diff)
                                             new_extra = abs(net_diff) if net_diff < 0 else 0.0
 
-                                            # Ενημέρωση γραμμής στο db_registrations
-                                            sh_reg.update_cell(r_i, xreos_col + 1, new_xreos)
-                                            sh_reg.update_cell(r_i, extra_col + 1, new_extra)
+                                            # Συλλογή αλλαγών για μαζική αποστολή (Batch)
+                                            batch_update_cells.append(gspread.Cell(r_i, xreos_col + 1, new_xreos))
+                                            batch_update_cells.append(gspread.Cell(r_i, extra_col + 1, new_extra))
 
-                                st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε και τα οικονομικά (χρέη) ενημερώθηκαν επιτυχώς!")
-                                time.sleep(1)
+                                # Μαζική ενημέρωση όλων των κελιών σε 1 μόνο αίτημα προς το Google Sheets (μηδενικά αιτήματα / γρήγορο)
+                                if batch_update_cells:
+                                    sh_reg.update_cells(batch_update_cells)
+
+                                st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε και τα χρέη ενημερώθηκαν στιγμιαία!")
+                                time.sleep(0.8)
                                 st.rerun()
                                 
                             except Exception as e:
