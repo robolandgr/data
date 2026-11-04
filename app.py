@@ -672,12 +672,12 @@ else:
                         })
 
                     if st.form_submit_button("💾 Αποθήκευση Παρουσιολογίου"):
-                        with st.spinner("⏳ Αστραπιαία αποθήκευση και ενημέρωση οικονομικών..."):
+                        with st.spinner("⏳ Αποθήκευση..."):
                             try:
                                 gc = get_gspread_client()
                                 sh = gc.open(OLD_SHEET_NAME)
                                 
-                                # 1. Ενημέρωση db_attendances
+                                # 1. Ενημέρωση db_attendances με μαζικό τρόπο
                                 try:
                                     sh_att = sh.worksheet("db_attendances")
                                 except:
@@ -733,11 +733,10 @@ else:
                                     for r_idx in sorted(rows_to_delete, reverse=True):
                                         sh_att.delete_rows(r_idx)
 
-                                # 2. ΕΛΕΓΧΟΣ ΟΙΚΟΝΟΜΙΚΩΝ (Χωρίς καθυστερήσεις / με χρήση του ήδη φορτωμένου regs_df)
+                                # 2. ΕΛΕΓΧΟΣ ΟΙΚΟΝΟΜΙΚΩΝ (Εκτελείται μόνο αν χρειάζεται, χωρίς βαριά loops)
                                 is_first_of_month = (selected_date_obj.day == 1 and selected_date_obj.month != 8)
 
                                 for c_id, prog_name in updated_customers:
-                                    # Ελέγχουμε γρήγορα από το regs_df αν ο μαθητής έχει κλειστή πληρωμή
                                     student_reg = regs_df[
                                         (regs_df['id_customer'].astype(str).str.strip() == str(c_id)) & 
                                         (regs_df['school_year'].astype(str).str.strip() == str(selected_year_att))
@@ -749,12 +748,11 @@ else:
                                         if "κλειστή πληρωμή" in e_val or "κλειστη πληρωμη" in e_val:
                                             is_closed = True
 
-                                    # Αν είναι ανοιχτή πληρωμή (ή είναι 1η του μήνα για κλειστή), ενημερώνουμε το χρέος
                                     if not is_closed or is_first_of_month:
                                         update_customer_xreos(c_id, selected_year_att, prog_name)
 
-                                st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε στιγμιαία και τα οικονομικά ενημερώθηκαν!")
-                                time.sleep(0.5)
+                                st.success("✅ Αποθηκεύτηκε επιτυχώς!")
+                                time.sleep(0.3)
                                 st.rerun()
                                 
                             except Exception as e:
