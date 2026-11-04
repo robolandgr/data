@@ -672,12 +672,12 @@ else:
                         })
 
                     if st.form_submit_button("💾 Αποθήκευση Παρουσιολογίου"):
-                        with st.spinner("⏳ Αποθήκευση..."):
+                        with st.spinner("⏳ Αποθήκευση παρουσιολογίου και άμεσος υπολογισμός χρεών..."):
                             try:
                                 gc = get_gspread_client()
                                 sh = gc.open(OLD_SHEET_NAME)
                                 
-                                # 1. Ενημέρωση db_attendances με μαζικό τρόπο
+                                # 1. Ενημέρωση db_attendances (Προσθήκη / Ενημέρωση / Διαγραφή)
                                 try:
                                     sh_att = sh.worksheet("db_attendances")
                                 except:
@@ -719,7 +719,7 @@ else:
                                                 str(selected_year_att), str(target_date_str), "ΝΑΙ"
                                             ])
                                             next_att_id += 1
-                                    else:
+                                    else: # Αν είναι ΟΧΙ
                                         if key in existing_dict:
                                             rows_to_delete.append(existing_dict[key])
                                             
@@ -733,7 +733,7 @@ else:
                                     for r_idx in sorted(rows_to_delete, reverse=True):
                                         sh_att.delete_rows(r_idx)
 
-                                # 2. ΕΛΕΓΧΟΣ ΟΙΚΟΝΟΜΙΚΩΝ (Εκτελείται μόνο αν χρειάζεται, χωρίς βαριά loops)
+                                # 2. ΕΝΗΜΕΡΩΣΗ ΟΙΚΟΝΟΜΙΚΩΝ (Χρέος)
                                 is_first_of_month = (selected_date_obj.day == 1 and selected_date_obj.month != 8)
 
                                 for c_id, prog_name in updated_customers:
@@ -744,15 +744,19 @@ else:
                                     
                                     is_closed = False
                                     if not student_reg.empty and 'energy' in student_reg.columns:
-                                        e_val = str(student_reg.iloc[0]['energy']).strip().lower()
-                                        if "κλειστή πληρωμή" in e_val or "κλειστη πληρωμη" in e_val:
+                                        e_val = remove_accents(str(student_reg.iloc[0]['energy'])).strip().lower()
+                                        if "κλειστη πληρωμη" in e_val:
                                             is_closed = True
 
+                                    # Ενημέρωση χρέους αν είναι ανοιχτή πληρωμή ή αν είναι η 1η του μήνα για κλειστή πληρωμή
                                     if not is_closed or is_first_of_month:
                                         update_customer_xreos(c_id, selected_year_att, prog_name)
 
-                                st.success("✅ Αποθηκεύτηκε επιτυχώς!")
-                                time.sleep(0.3)
+                                # Εκκαθάριση cache για άμεση ανάγνωση των νέων δεδομένων
+                                load_specific_db.clear()
+
+                                st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε και τα χρέη ενημερώθηκαν επιτυχώς!")
+                                time.sleep(0.5)
                                 st.rerun()
                                 
                             except Exception as e:
