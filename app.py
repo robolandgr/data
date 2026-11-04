@@ -100,6 +100,7 @@ def update_customer_xreos(c_id, school_year, program):
         
         id_col_idx = header.index('id_customer') if 'id_customer' in header else 1
         year_col_idx = header.index('school_year') if 'school_year' in header else 7
+        class_col_idx = header.index('class') if 'class' in header else 6
         
         reg_row_idx = None
         r_item = None
@@ -116,15 +117,20 @@ def update_customer_xreos(c_id, school_year, program):
         if not reg_row_idx or not r_item:
             return
 
+        # 1. ΕΛΕΓΧΟΣ ΤΜΗΜΑΤΟΣ: Αν ΔΕΝ είναι Ιδιωτικά (π.χ. Voucher), ΔΕΝ πειράζουμε ΑΠΟΛΥΤΩΣ ΤΙΠΟΤΑ
+        class_val = str(r_item[class_col_idx]).strip().lower() if len(r_item) > class_col_idx else ""
+        if "ιδιωτικά" not in class_val and "ιδιωτικα" not in class_val:
+            return
+
+        # 2. ΕΛΕΓΧΟΣ ΤΥΠΟΥ ΠΛΗΡΩΜΗΣ: Αν είναι Κλειστή Πληρωμή, ΔΕΝ την πειράζουμε
         energy_idx = header.index('energy') if 'energy' in header else 10
         energy_val = str(r_item[energy_idx]).strip().lower() if len(r_item) > energy_idx else ""
-        
         is_closed_payment = "κλειστή πληρωμή" in energy_val or "κλειστη πληρωμη" in energy_val
 
-        # Αν είναι κλειστή πληρωμή, δεν επηρεάζεται από το παρουσιολόγιο (το χρέος παραμένει ασχέτητο με παρουσίες)
         if is_closed_payment:
             return
 
+        # --- ΑΠΟ ΕΔΩ ΚΑΙ ΚΑΤΩ ΑΦΟΡΑ ΜΟΝΟ ΑΝΟΙΧΤΕΣ ΠΛΗΡΩΜΕΣ ΣΤΑ ΙΔΙΩΤΙΚΑ ---
         sh_pay = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
         pay_data = sh_pay.get_all_records()
         total_paid = 0.0
