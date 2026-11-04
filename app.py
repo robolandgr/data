@@ -58,17 +58,19 @@ def get_gspread_client():
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     return gspread.authorize(creds)
 
-@st.cache_data(ttl=36000)
+@st.cache_data(ttl=600, show_spinner=False)
 def load_specific_db(sheet_name):
     try:
         gc = get_gspread_client()
         ws = gc.open(OLD_SHEET_NAME).worksheet(sheet_name)
         rows = ws.get_all_values()
-        if not rows: return pd.DataFrame()
+        if not rows: 
+            return pd.DataFrame()
         df = pd.DataFrame(rows[1:], columns=rows[0])
         df.columns = df.columns.astype(str).str.strip()
         return df
     except Exception as e:
+        print(f"Error loading {sheet_name}: {e}")
         return pd.DataFrame()
 
 st.set_page_config(page_title="ROBOLAND DB", page_icon="🤖", layout="wide")
