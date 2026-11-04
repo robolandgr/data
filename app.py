@@ -104,24 +104,16 @@ def remove_accents(input_str):
     nfkd_form = unicodedata.normalize('NFKD', input_str)
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
-def update_customer_xreos(c_id, school_year, program):
+def update_customer_xreos(c_id, school_year, program, sh_reg, sh_pay, sh_att, reg_all_values, reg_header, pay_data_all, att_data_all):
     try:
-        gc = get_gspread_client()
-        sh_reg = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
-        
-        all_rows = sh_reg.get_all_values()
-        if len(all_rows) < 2:
-            return
-            
-        header = [str(c).strip() for c in all_rows[0]]
-        
-        id_col_idx = header.index('id_customer') if 'id_customer' in header else 1
-        year_col_idx = header.index('school_year') if 'school_year' in header else 7
+        # Εντοπισμός γραμμής μαθητή από τα ήδη φορτωμένα δεδομένα (χωρίς επιπλέον Read requests)
+        id_col_idx = reg_header.index('id_customer') if 'id_customer' in reg_header else 1
+        year_col_idx = reg_header.index('school_year') if 'school_year' in reg_header else 7
         
         reg_row_idx = None
         r_item = None
         
-        for idx, row in enumerate(all_rows[1:], start=2):
+        for idx, row in enumerate(reg_all_values[1:], start=2):
             row_id = str(row[id_col_idx]).strip() if len(row) > id_col_idx else ""
             row_year = str(row[year_col_idx]).strip() if len(row) > year_col_idx else ""
             
@@ -131,65 +123,49 @@ def update_customer_xreos(c_id, school_year, program):
                 break
                 
         if not reg_row_idx or not r_item:
-            return
+            return None, None
 
-        # Ελέγχουμε τον τύπο πληρωμής (energy)
-        energy_idx = header.index('energy') if 'energy' in header else 10
-        energy_val = str(r_item[energy_idx]).strip().lower() if len(r_item) > energy_idx else ""
-        
-        is_closed_payment = "κλειστή πληρωμή" in energy_val or "κλειστη πληρωμη" in energy_val
+        # Έλεγχος τύπου πληρωμής (energy)
+        energy_idx = reg_header.index('energy') if 'energy' in reg_header else 10
+        raw_energy = str(r_item[energy_idx]) if len(r_item) > energy_idx else ""
+        energy_val = remove_accents(raw_energy).strip().lower()
+        is_closed_payment = "κλειστη πληρωμη" in energy_val
 
-        # Υπολογισμός συνολικών πληρωμών πελάτη
-        sh_pay = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
-        pay_data = sh_pay.get_all_records()
+        # Υπολογισμός συνολικών πληρωμών από τα ήδη φορτωμένα δεδομένα πληρωμών
         total_paid = 0.0
-        if pay_data:
-            df_pay = pd.DataFrame(pay_data)
-            df_pay.columns = df_pay.columns.astype(str).str.strip()
-            mask_pay = (
-                (df_pay['id_customer'].astype(str).str.strip() == str(c_id)) & 
-                (df_pay['school_year'].astype(str).str.strip() == str(school_year))
-            )
-            total_paid = pd.to_numeric(df_pay.loc[mask_pay, 'amount_paid'], errors='coerce').fillna(0).sum()
+        if pay_data_all:
+            df_pay = pd.DataFrame(pay_data_all[1:], columns=[str(c).strip() for c in pay_data_all[0]])
+            if not df_pay.empty and 'id_customer' in df_pay.columns:
+                mask_pay = (
+                    (df_pay['id_customer'].astype(str).str.strip() == str(c_id)) & 
+                    (df_pay['school_year'].astype(str).str.strip() == str(school_year))
+                )
+                total_paid = pd.to_numeric(df_pay.loc[mask_pay, 'amount_paid'], errors='coerce').fillna(0).sum()
+
+        adj_cost = 0.0
+        try:
+            adj_idx = reg_header.index('adjusted_cost') if 'adjusted_cost' in reg_header else 9
+            adj_str = str(r_item[adj_idx]).replace(',', '.').strip()
+            adj_cost = float(adj_str) if adj_str else 0.0
+        except:
+            adj_cost = 0.0
 
         if is_closed_payment:
-            # --- ΠΕΡΙΠΤΩΣΗ: ΚΛΕΙΣΤΗ ΠΛΗΡΩΜΗ ---
-            # Το χρέος είναι το Συμφωνηθέν Ποσό (adjusted_cost) μείον τις συνολικές πληρωμές
-            adj_cost = 0.0
-            try:
-                adj_idx = header.index('adjusted_cost') if 'adjusted_cost' in header else 9
-                adj_str = str(r_item[adj_idx]).replace(',', '.').strip()
-                adj_cost = float(adj_str) if adj_str else 0.0
-            except:
-                adj_cost = 0.0
-
             net_difference = adj_cost - total_paid
         else:
-            # --- ΠΕΡΙΠΤΩΣΗ: ΑΝΟΙΧΤΗ ΠΛΗΡΩΜΗ (Βάσει Παρουσιών) ---
-            adj_cost = 0.0
-            try:
-                adj_idx = header.index('adjusted_cost') if 'adjusted_cost' in header else 9
-                adj_str = str(r_item[adj_idx]).replace(',', '.').strip()
-                adj_cost = float(adj_str) if adj_str else 0.0
-            except:
-                adj_cost = 0.0
-
-            sh_att = gc.open(OLD_SHEET_NAME).worksheet("db_attendances")
-            att_data = sh_att.get_all_records()
             total_nais = 0
-            if att_data:
-                df_att = pd.DataFrame(att_data)
-                df_att.columns = df_att.columns.astype(str).str.strip()
-                total_nais = df_att[
-                    (df_att['id_customer'].astype(str).str.strip() == str(c_id)) & 
-                    (df_att['school_year'].astype(str).str.strip() == str(school_year)) & 
-                    (df_att['status'].astype(str).str.strip().str.upper() == 'ΝΑΙ')
-                ].shape[0]
+            if att_data_all:
+                df_att = pd.DataFrame(att_data_all[1:], columns=[str(c).strip() for c in att_data_all[0]])
+                if not df_att.empty and 'id_customer' in df_att.columns:
+                    total_nais = df_att[
+                        (df_att['id_customer'].astype(str).str.strip() == str(c_id)) & 
+                        (df_att['school_year'].astype(str).str.strip() == str(school_year)) & 
+                        (df_att['status'].astype(str).str.strip().str.upper() == 'ΝΑΙ')
+                    ].shape[0]
 
             total_lessons_cost = total_nais * adj_cost
             net_difference = total_lessons_cost - total_paid
 
-        # ΔΙΟΡΘΩΜΕΝΟΣ ΥΠΟΛΟΓΙΣΜΟΣ ΧΡΕΟΥΣ ΚΑΙ ΠΟΡΤΟΦΟΛΙΟΥ
         if net_difference > 0:
             current_xreos = net_difference
             current_extra_pay = 0.0
@@ -200,16 +176,14 @@ def update_customer_xreos(c_id, school_year, program):
             current_xreos = 0.0
             current_extra_pay = 0.0
 
-        # Ενημέρωση στη βάση (Στήλη xreos και extra_pay)
-        xreos_idx = header.index('xreos') if 'xreos' in header else 11
-        extra_idx = header.index('extra_pay') if 'extra_pay' in header else 14
-        
-        sh_reg.update_cell(reg_row_idx, xreos_idx + 1, current_xreos)
-        sh_reg.update_cell(reg_row_idx, extra_idx + 1, current_extra_pay)
+        xreos_idx = reg_header.index('xreos') if 'xreos' in reg_header else 11
+        extra_idx = reg_header.index('extra_pay') if 'extra_pay' in reg_header else 14
+
+        return reg_row_idx, (current_xreos, current_extra_pay, xreos_idx, extra_idx)
         
     except Exception as e:
         print(f"Error in update_customer_xreos: {e}")
-        pass
+        return None, None
         
 def generate_single_attendance_pdf(attendance_rows, date_str, school_year):
     buffer = io.BytesIO()
