@@ -564,7 +564,6 @@ else:
                     st.rerun()
  #----------------------------------------------------------------------   
    # --- ΣΕΛΙΔΑ: ΠΑΡΟΥΣΙΟΛΟΓΙΟ (ΤΜΗΜΑ: ΙΔΙΩΤΙΚΑ) ---
-    # --- ΣΕΛΙΔΑ: ΠΑΡΟΥΣΙΟΛΟΓΙΟ (ΤΜΗΜΑ: ΙΔΙΩΤΙΚΑ) ---
     elif st.session_state.page == "attendances_page":
         if st.button("⬅️ Μενού", use_container_width=True): 
             st.session_state.page = "menu"
