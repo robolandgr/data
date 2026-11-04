@@ -133,32 +133,13 @@ def update_customer_xreos(c_id, school_year, program):
         if not reg_row_idx or not r_item:
             return
 
-        # 1. Adjusted Cost
-        adj_cost = 0.0
-        try:
-            adj_idx = header.index('adjusted_cost') if 'adjusted_cost' in header else 9
-            adj_str = str(r_item[adj_idx]).replace(',', '.').strip()
-            adj_cost = float(adj_str) if adj_str else 0.0
-        except:
-            adj_cost = 0.0
+        # Ελέγχουμε τον τύπο πληρωμής (energy)
+        energy_idx = header.index('energy') if 'energy' in header else 10
+        energy_val = str(r_item[energy_idx]).strip().lower() if len(r_item) > energy_idx else ""
+        
+        is_closed_payment = "κλειστή πληρωμή" in energy_val or "κλειστη πληρωμη" in energy_val
 
-        # 2. Μετράμε τις συνολικές παρουσίες "ΝΑΙ" από το db_attendances
-        sh_att = gc.open(OLD_SHEET_NAME).worksheet("db_attendances")
-        att_data = sh_att.get_all_records()
-        total_nais = 0
-        if att_data:
-            df_att = pd.DataFrame(att_data)
-            df_att.columns = df_att.columns.astype(str).str.strip()
-            total_nais = df_att[
-                (df_att['id_customer'].astype(str).str.strip() == str(c_id)) & 
-                (df_att['school_year'].astype(str).str.strip() == str(school_year)) & 
-                (df_att['status'].astype(str).str.strip().str.upper() == 'ΝΑΙ')
-            ].shape[0]
-
-        # Συνολικό κόστος μαθημάτων
-        total_lessons_cost = total_nais * adj_cost
-
-        # 3. Αθροίζουμε τις κανονικές πληρωμές από το db_payments
+        # Υπολογισμός συνολικών πληρωμών πελάτη
         sh_pay = gc.open(OLD_SHEET_NAME).worksheet("db_payments")
         pay_data = sh_pay.get_all_records()
         total_paid = 0.0
@@ -171,23 +152,57 @@ def update_customer_xreos(c_id, school_year, program):
             )
             total_paid = pd.to_numeric(df_pay.loc[mask_pay, 'amount_paid'], errors='coerce').fillna(0).sum()
 
-        # 4. Αυτόματος υπολογισμός βάσει Επιλογής Β:
-        # Αν οι πληρωμές είναι μεγαλύτερες από το κόστος, το xreos γίνεται 0 και η διαφορά πάει στο extra_pay (Στήλη O).
-        # Αν το κόστος είναι μεγαλύτερο από τις πληρωμές, το xreos παίρνει τη διαφορά και το extra_pay γίνεται 0.
-        net_difference = total_lessons_cost - total_paid
+        if is_closed_payment:
+            # --- ΠΕΡΙΠΤΩΣΗ: ΚΛΕΙΣΤΗ ΠΛΗΡΩΜΗ ---
+            # Το χρέος είναι το Συμφωνηθέν Ποσό (adjusted_cost) μείον τις συνολικές πληρωμές
+            adj_cost = 0.0
+            try:
+                adj_idx = header.index('adjusted_cost') if 'adjusted_cost' in header else 9
+                adj_str = str(r_item[adj_idx]).replace(',', '.').strip()
+                adj_cost = float(adj_str) if adj_str else 0.0
+            except:
+                adj_cost = 0.0
 
+            net_difference = adj_cost - total_paid
+        else:
+            # --- ΠΕΡΙΠΤΩΣΗ: ΑΝΟΙΧΤΗ ΠΛΗΡΩΜΗ (Βάσει Παρουσιών) ---
+            adj_cost = 0.0
+            try:
+                adj_idx = header.index('adjusted_cost') if 'adjusted_cost' in header else 9
+                adj_str = str(r_item[adj_idx]).replace(',', '.').strip()
+                adj_cost = float(adj_str) if adj_str else 0.0
+            except:
+                adj_cost = 0.0
+
+            sh_att = gc.open(OLD_SHEET_NAME).worksheet("db_attendances")
+            att_data = sh_att.get_all_records()
+            total_nais = 0
+            if att_data:
+                df_att = pd.DataFrame(att_data)
+                df_att.columns = df_att.columns.astype(str).str.strip()
+                total_nais = df_att[
+                    (df_att['id_customer'].astype(str).str.strip() == str(c_id)) & 
+                    (df_att['school_year'].astype(str).str.strip() == str(school_year)) & 
+                    (df_att['status'].astype(str).str.strip().str.upper() == 'ΝΑΙ')
+                ].shape[0]
+
+            total_lessons_cost = total_nais * adj_cost
+            net_difference = total_lessons_cost - total_paid
+
+        # Υπολογισμός τελικού χρέους και πορτοφολιού (extra_pay)
         if net_difference > 0:
             current_xreos = net_difference
             current_extra_pay = 0.0
         else:
             current_xreos = 0.0
-            current_extra_pay = abs(net_difference) # Η υπερπληρωμή γίνεται αυτόματα extra_pay (πορτοφόλι)
+            current_extra_pay = abs(net_difference)
 
-        # 5. Ενημέρωση Google Sheet:
-        # Στήλη L (12) = xreos
-        # Στήλη O (15) = extra_pay
-        sh_reg.update_cell(reg_row_idx, 12, current_xreos)
-        sh_reg.update_cell(reg_row_idx, 15, current_extra_pay)
+        # Ενημέρωση στη βάση (Στήλη xreos και extra_pay)
+        xreos_idx = header.index('xreos') if 'xreos' in header else 11
+        extra_idx = header.index('extra_pay') if 'extra_pay' in header else 14
+        
+        sh_reg.update_cell(reg_row_idx, xreos_idx + 1, current_xreos)
+        sh_reg.update_cell(reg_row_idx, extra_idx + 1, current_extra_pay)
         
     except Exception as e:
         print(f"Error in update_customer_xreos: {e}")
