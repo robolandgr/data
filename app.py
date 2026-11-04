@@ -564,6 +564,7 @@ else:
                     st.rerun()
  #----------------------------------------------------------------------   
    # --- ΣΕΛΙΔΑ: ΠΑΡΟΥΣΙΟΛΟΓΙΟ (ΤΜΗΜΑ: ΙΔΙΩΤΙΚΑ) ---
+    # --- ΣΕΛΙΔΑ: ΠΑΡΟΥΣΙΟΛΟΓΙΟ (ΤΜΗΜΑ: ΙΔΙΩΤΙΚΑ) ---
     elif st.session_state.page == "attendances_page":
         if st.button("⬅️ Μενού", use_container_width=True): 
             st.session_state.page = "menu"
@@ -578,26 +579,21 @@ else:
         target_date_str = selected_date_obj.strftime('%Y-%m-%d')
         st.info(f"Επιλεγμένη Ημερομηνία Καταγραφής: **{target_date_str}** | Σχολικό Έτος: **{selected_year_att}**")
 
-        # Ασφαλής φόρτωση με μηχανισμό επανάληψης (retry) για αποφυγή καθυστερήσεων του Google Sheets
-        max_retries = 3
-        regs_df, cust_df, att_df = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-
-        for attempt in range(max_retries):
-            regs_df = load_specific_db("db_registrations")
-            cust_df = load_specific_db("db_customers")
-            att_df = load_specific_db("db_attendances")
-            
-            if not regs_df.empty and not cust_df.empty:
-                break
-            time.sleep(0.5)
+        # Γρήγορη φόρτωση δεδομένων μία φορά
+        regs_df = load_specific_db("db_registrations")
+        cust_df = load_specific_db("db_customers")
+        att_df = load_specific_db("db_attendances")
+        pay_df = load_specific_db("db_payments")
 
         if regs_df.empty or cust_df.empty:
-            st.warning("⏳ Γίνεται συγχρονισμός δεδομένων από το Google Sheets, παρακαλώ περιμένετε...")
-            time.sleep(1)
-            st.rerun()
+            st.warning("⚠️ Δεν βρέθηκαν δεδομένα εγγραφών ή πελατών. Παρακαλώ δοκιμάστε ξανά.")
         else:
             regs_df.columns = regs_df.columns.astype(str).str.strip()
             cust_df.columns = cust_df.columns.astype(str).str.strip()
+            if not att_df.empty:
+                att_df.columns = att_df.columns.astype(str).str.strip()
+            if not pay_df.empty:
+                pay_df.columns = pay_df.columns.astype(str).str.strip()
             
             priv_regs = regs_df[
                 (regs_df['class'].astype(str).str.strip().str.lower() == 'ιδιωτικά') & 
@@ -609,7 +605,6 @@ else:
             else:
                 target_date_att = pd.DataFrame()
                 if not att_df.empty and 'date' in att_df.columns:
-                    att_df.columns = att_df.columns.astype(str).str.strip()
                     target_date_att = att_df[
                         (att_df['date'].astype(str).str.strip() == target_date_str) & 
                         (att_df['school_year'].astype(str).str.strip() == selected_year_att)
@@ -625,7 +620,6 @@ else:
                         fname = str(r['customer_firstname']).strip()
                         lname = str(r['customer_lastname']).strip()
                         prog_name = str(r.get('program', '')).strip()
-                        reg_id = str(r.get('id_registration', '')).strip()
                         
                         adj_cost_val = 0.0
                         try:
@@ -647,12 +641,9 @@ else:
                         col1.write(f"**{lname} {fname}** (ID: {c_id})")
                         col2.write(f"Πρόγραμμα: *{prog_name}* | Κόστος/Μάθημα: {adj_cost_val:.2f}€")
                         val = col3.toggle("ΝΑΙ / ΟΧΙ", value=default_val, key=f"att_{c_id}_{target_date_str}")
-                        
-                        reg_row_index = idx + 2
 
                         attendance_inputs[c_id] = {
                             'val': "ΝΑΙ" if val else "ΟΧΙ",
-                            'reg_row_index': reg_row_index,
                             'adj_cost': adj_cost_val,
                             'prog': prog_name,
                             'fname': fname,
@@ -666,12 +657,12 @@ else:
                         })
 
                     if st.form_submit_button("💾 Αποθήκευση Παρουσιολογίου"):
-                        with st.spinner("⏳ Γρήγορη αποθήκευση παρουσιολογίου και ενημέρωση οικονομικών..."):
+                        with st.spinner("⏳ Αποθήκευση παρουσιολογίου και άμεσος υπολογισμός οικονομικών..."):
                             try:
                                 gc = get_gspread_client()
                                 sh = gc.open(OLD_SHEET_NAME)
                                 
-                                # 1. Άνοιγμα ή δημιουργία db_attendances
+                                # 1. Ενημέρωση db_attendances
                                 try:
                                     sh_att = sh.worksheet("db_attendances")
                                 except:
@@ -679,82 +670,111 @@ else:
                                     sh_att.append_row(["id_attendance", "id_customer", "student_name", "school_year", "date", "status"])
 
                                 att_data = sh_att.get_all_values()
-                                header_att = att_data[0] if att_data else ["id_attendance", "id_customer", "student_name", "school_year", "date", "status"]
                                 existing_rows = att_data[1:] if len(att_data) > 1 else []
 
-                                # Δημιουργία ενός γρήγορου dictionary για τις υπάρχουσες παρουσίες της ημέρας
-                                # Key: (id_customer, date, school_year) -> row_index (1-based)
                                 existing_dict = {}
                                 max_id = 0
-                                
-                                for idx, row in enumerate(existing_rows, start=2):
+                                for idx_r, row in enumerate(existing_rows, start=2):
                                     if len(row) >= 6:
                                         try:
                                             r_id = int(row[0])
-                                            if r_id > max_id:
-                                                max_id = r_id
+                                            if r_id > max_id: max_id = r_id
                                         except:
                                             pass
-                                        
                                         c_key = (str(row[1]).strip(), str(row[4]).strip(), str(row[3]).strip())
-                                        existing_dict[c_key] = idx
+                                        existing_dict[c_key] = idx_r
 
                                 next_att_id = max_id + 1
                                 rows_to_append = []
-                                rows_to_update = [] # λίστα με (row_index, new_status)
-                                rows_to_delete = [] # λίστα με row_indices προς διαγραφή (αν γίνει ΟΧΙ)
-                                
-                                updated_customers_to_calc = set()
+                                rows_to_update = []
+                                rows_to_delete = []
 
                                 for c_id, data in attendance_inputs.items():
-                                    status_val = data['val'] # "ΝΑΙ" ή "ΟΧΙ"
+                                    status_val = data['val']
                                     key = (str(c_id).strip(), str(target_date_str).strip(), str(selected_year_att).strip())
                                     
                                     if status_val == "ΝΑΙ":
                                         if key in existing_dict:
-                                            # Υπάρχει ήδη, ενημερώνουμε το status αν χρειάζεται
-                                            r_idx = existing_dict[key]
-                                            rows_to_update.append((r_idx, "ΝΑΙ"))
+                                            rows_to_update.append((existing_dict[key], "ΝΑΙ"))
                                         else:
-                                            # Δεν υπάρχει, προσθήκη νέας γραμμής
                                             rows_to_append.append([
-                                                next_att_id, 
-                                                str(c_id), 
-                                                f"{data['lname']} {data['fname']}", 
-                                                str(selected_year_att), 
-                                                str(target_date_str), 
-                                                "ΝΑΙ"
+                                                next_att_id, str(c_id), f"{data['lname']} {data['fname']}", 
+                                                str(selected_year_att), str(target_date_str), "ΝΑΙ"
                                             ])
                                             next_att_id += 1
-                                    else: # Αν είναι ΟΧΙ
+                                    else:
                                         if key in existing_dict:
-                                            # Υπάρχει στη βάση αλλά τώρα μπήκε ΟΧΙ -> Άρα το διαγράφουμε
                                             rows_to_delete.append(existing_dict[key])
-                                    
-                                    updated_customers_to_calc.add((c_id, data['prog']))
 
-                                # Εκτέλεση μαζικών αλλαγών στο Google Sheets για μέγιστη ταχύτητα
                                 if rows_to_append:
                                     sh_att.append_rows(rows_to_append)
-
                                 for r_idx, new_stat in rows_to_update:
                                     sh_att.update_cell(r_idx, 6, new_stat)
-
-                                # Διαγραφή γραμμών (από κάτω προς τα πάνω για να μη χαθούν τα indexes)
                                 if rows_to_delete:
                                     for r_idx in sorted(rows_to_delete, reverse=True):
                                         sh_att.delete_rows(r_idx)
 
-                                # 2. Ενημέρωση οικονομικών για τους επηρεαζόμενους μαθητές
-                                for c_id, prog_name in updated_customers_to_calc:
-                                    update_customer_xreos(c_id, selected_year_att, prog_name)
+                                # 2. Ενημέρωση οικονομικών (Xreos) για όλους τους μαθητές μαζικά
+                                time.sleep(0.5) # Μικρή παύση για συγχρονισμό του Google Sheet
+                                updated_att_df = pd.DataFrame(sh_att.get_all_values()[1:], columns=sh_att.get_all_values()[0])
+                                updated_att_df.columns = updated_att_df.columns.astype(str).str.strip()
 
-                                st.success("✅ Το παρουσιολόγιο ενημερώθηκε αστραπιαία και τα οικονομικά υπολογίστηκαν σωστά!")
-                                time.sleep(0.8)
+                                sh_reg = sh.worksheet("db_registrations")
+                                reg_all_values = sh_reg.get_all_values()
+                                reg_header = [str(c).strip() for c in reg_all_values[0]]
+                                
+                                id_c_col = reg_header.index('id_customer') if 'id_customer' in reg_header else 1
+                                yr_col = reg_header.index('school_year') if 'school_year' in reg_header else 4
+                                adj_col = reg_header.index('adjusted_cost') if 'adjusted_cost' in reg_header else 9
+                                xreos_col = reg_header.index('xreos') if 'xreos' in reg_header else 11
+                                extra_col = reg_header.index('extra_pay') if 'extra_pay' in reg_header else 14
+
+                                for r_i, r_val in enumerate(reg_all_values[1:], start=2):
+                                    if len(r_val) > max(id_c_col, yr_col):
+                                        row_cust_id = str(r_val[id_c_col]).strip()
+                                        row_year = str(r_val[yr_col]).strip()
+                                        
+                                        if row_year == str(selected_year_att):
+                                            # Υπολογισμός συνολικών ΝΑΙ για τον μαθητή
+                                            cust_nais = 0
+                                            if not updated_att_df.empty and 'id_customer' in updated_att_df.columns:
+                                                cust_nais = updated_att_df[
+                                                    (updated_att_df['id_customer'].astype(str).str.strip() == row_cust_id) & 
+                                                    (updated_att_df['school_year'].astype(str).str.strip() == str(selected_year_att)) & 
+                                                    (updated_att_df['status'].astype(str).str.strip().str.upper() == 'ΝΑΙ')
+                                                ].shape[0]
+
+                                            adj_c = 0.0
+                                            try:
+                                                adj_c = float(str(r_val[adj_col]).replace(',', '.'))
+                                            except:
+                                                adj_c = 0.0
+
+                                            total_lessons_cost = cust_nais * adj_c
+
+                                            # Υπολογισμός πληρωμών
+                                            total_paid = 0.0
+                                            if not pay_df.empty and 'id_customer' in pay_df.columns:
+                                                mask_p = (
+                                                    (pay_df['id_customer'].astype(str).str.strip() == row_cust_id) & 
+                                                    (pay_df['school_year'].astype(str).str.strip() == str(selected_year_att))
+                                                )
+                                                total_paid = pd.to_numeric(pay_df.loc[mask_p, 'amount_paid'], errors='coerce').fillna(0).sum()
+
+                                            net_diff = total_lessons_cost - total_paid
+                                            new_xreos = max(0.0, net_diff)
+                                            new_extra = abs(net_diff) if net_diff < 0 else 0.0
+
+                                            # Ενημέρωση γραμμής στο db_registrations
+                                            sh_reg.update_cell(r_i, xreos_col + 1, new_xreos)
+                                            sh_reg.update_cell(r_i, extra_col + 1, new_extra)
+
+                                st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε και τα οικονομικά (χρέη) ενημερώθηκαν επιτυχώς!")
+                                time.sleep(1)
                                 st.rerun()
                                 
                             except Exception as e:
-                                st.error(f"Σφάλμα αποθήκευσης παρουσιών: {e}")
+                                st.error(f"Σφάλμα αποθήκευσης και υπολογισμού: {e}")
                 
                 st.markdown("<br>", unsafe_allow_html=True)
                 pdf_bytes = generate_single_attendance_pdf(pdf_preview_rows, target_date_str, selected_year_att)
