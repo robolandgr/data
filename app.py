@@ -189,13 +189,16 @@ def update_customer_xreos(c_id, school_year, program):
             total_lessons_cost = total_nais * adj_cost
             net_difference = total_lessons_cost - total_paid
 
-        # Υπολογισμός τελικού χρέους και πορτοφολιού (extra_pay)
+        # ΔΙΟΡΘΩΜΕΝΟΣ ΥΠΟΛΟΓΙΣΜΟΣ ΧΡΕΟΥΣ ΚΑΙ ΠΟΡΤΟΦΟΛΙΟΥ
         if net_difference > 0:
             current_xreos = net_difference
             current_extra_pay = 0.0
-        else:
+        elif net_difference < 0:
             current_xreos = 0.0
             current_extra_pay = abs(net_difference)
+        else:
+            current_xreos = 0.0
+            current_extra_pay = 0.0
 
         # Ενημέρωση στη βάση (Στήλη xreos και extra_pay)
         xreos_idx = header.index('xreos') if 'xreos' in header else 11
@@ -610,7 +613,8 @@ else:
             
             priv_regs = regs_df[
                 (regs_df['class'].astype(str).str.strip().str.lower() == 'ιδιωτικά') & 
-                (regs_df['school_year'].astype(str).str.strip() == selected_year_att)
+                (regs_df['school_year'].astype(str).str.strip() == selected_year_att) &
+                (regs_df['id_customer'].astype(str).str.strip() != '213') # <--- Εξαιρεί εσένα από το παρουσιολόγιο
             ].copy()
 
             if priv_regs.empty:
