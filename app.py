@@ -653,49 +653,45 @@ else:
                         })
 
                     if st.form_submit_button("💾 Αποθήκευση Παρουσιολογίου"):
-                        try:
-                            gc = get_gspread_client()
-                            
+                        with st.spinner("⏳ Αποθήκευση παρουσιολογίου και ενημέρωση οικονομικών..."):
                             try:
-                                sh_att = gc.open(OLD_SHEET_NAME).worksheet("db_attendances")
-                            except:
-                                sh_att = gc.open(OLD_SHEET_NAME).add_worksheet(title="db_attendances", rows="1000", cols="10")
-                                sh_att.append_row(["id_attendance", "id_customer", "student_name", "school_year", "date", "status"])
-
-                            att_records = sh_att.get_all_records()
-                            next_att_id = int(pd.DataFrame(att_records)['id_attendance'].max()) + 1 if att_records and 'id_attendance' in pd.DataFrame(att_records).columns else 1
-                            
-                            sh_reg = gc.open(OLD_SHEET_NAME).worksheet("db_registrations")
-                            all_reg_values = sh_reg.get_all_values()
-
-                            rows_to_append_or_update = []
-                            for c_id, data in attendance_inputs.items():
-                                if data['val']: 
-                                    rows_to_append_or_update.append((c_id, data))
-
-                            for c_id, data in rows_to_append_or_update:
-                                found_att = False
+                                gc = get_gspread_client()
                                 
-                                if att_records:
-                                    for ai, a_row in enumerate(att_records, start=2):
-                                        if str(a_row.get('id_customer', '')).strip() == c_id and str(a_row.get('date', '')).strip() == target_date_str and str(a_row.get('school_year', '')).strip() == selected_year_att:
-                                            sh_att.update_cell(ai, 6, "ΝΑΙ")
-                                            found_att = True
-                                            break
-                                            
-                                if not found_att:
-                                    sh_att.append_row([next_att_id, c_id, f"{data['lname']} {data['fname']}", selected_year_att, target_date_str, "ΝΑΙ"])
-                                    next_att_id += 1
+                                try:
+                                    sh_att = gc.open(OLD_SHEET_NAME).worksheet("db_attendances")
+                                except:
+                                    sh_att = gc.open(OLD_SHEET_NAME).add_worksheet(title="db_attendances", rows="1000", cols="10")
+                                    sh_att.append_row(["id_attendance", "id_customer", "student_name", "school_year", "date", "status"])
 
-                                # 🌟 ΚΛΗΣΗ ΤΗΣ ΚΕΝΤΡΙΚΗΣ ΣΥΝΑΡΤΗΣΗΣ ΥΠΟΛΟΓΙΣΜΟΥ (ΑΥΤΟΜΑΤΟΣ ΣΥΜΨΗΦΙΣΜΟΣ ΜΕ EXTRA PAY)
-                                update_customer_xreos(c_id, selected_year_att, data['prog'])
+                                att_records = sh_att.get_all_records()
+                                next_att_id = int(pd.DataFrame(att_records)['id_attendance'].max()) + 1 if att_records and 'id_attendance' in pd.DataFrame(att_records).columns else 1
+                                
+                                updated_customers_to_calc = set()
 
-                            st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε επιτυχώς και τα οικονομικά ενημερώθηκαν!")
-                            time.sleep(1.2)
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Σφάλμα αποθήκευσης παρουσιών: {e}")
+                                for c_id, data in attendance_inputs.items():
+                                    if data['val']:
+                                        found_att = False
+                                        if att_records:
+                                            for ai, a_row in enumerate(att_records, start=2):
+                                                if str(a_row.get('id_customer', '')).strip() == c_id and str(a_row.get('date', '')).strip() == target_date_str and str(a_row.get('school_year', '')).strip() == selected_year_att:
+                                                    sh_att.update_cell(ai, 6, "ΝΑΙ")
+                                                    found_att = True
+                                                    break
+                                        if not found_att:
+                                            sh_att.append_row([next_att_id, c_id, f"{data['lname']} {data['fname']}", selected_year_att, target_date_str, "ΝΑΙ"])
+                                            next_att_id += 1
+                                        
+                                        updated_customers_to_calc.add((c_id, data['prog']))
 
+                                # Υπολογισμός οικονομικών ΜΕΤΑ την αποθήκευση των παρουσιών για κάθε επηρεαζόμενο μαθητή
+                                for c_id, prog_name in updated_customers_to_calc:
+                                    update_customer_xreos(c_id, selected_year_att, prog_name)
+
+                                st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε επιτυχώς και τα οικονομικά ενημερώθηκαν!")
+                                time.sleep(1.0)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Σφάλμα αποθήκευσης παρουσιών: {e}")
                 st.markdown("<br>", unsafe_allow_html=True)
                 pdf_bytes = generate_single_attendance_pdf(pdf_preview_rows, target_date_str, selected_year_att)
                 if pdf_bytes:
