@@ -608,7 +608,7 @@ else:
             if not att_df.empty:
                 att_df.columns = att_df.columns.astype(str).str.strip()
             
-            # Φιλτράρισμα ιδιωτικών, επιλεγμένου έτους και ΕΞΑΙΡΕΣΗ του ID 213
+            # Φιλτράρισμα ιδιωτικών, επιλεγμένου έτους και ΕΞΑΙΡΕΣΗ του ID 213 (Κουρέας Χάρης)
             priv_regs = regs_df[
                 (regs_df['class'].astype(str).str.strip().str.lower() == 'ιδιωτικά') & 
                 (regs_df['school_year'].astype(str).str.strip() == selected_year_att) &
@@ -672,7 +672,7 @@ else:
                         })
 
                     if st.form_submit_button("💾 Αποθήκευση Παρουσιολογίου"):
-                        with st.spinner("⏳ Αποθήκευση παρουσιολογίου και ενημέρωση οικονομικών..."):
+                        with st.spinner("⏳ Αστραπιαία αποθήκευση και ενημέρωση οικονομικών..."):
                             try:
                                 gc = get_gspread_client()
                                 sh = gc.open(OLD_SHEET_NAME)
@@ -733,33 +733,28 @@ else:
                                     for r_idx in sorted(rows_to_delete, reverse=True):
                                         sh_att.delete_rows(r_idx)
 
-                                # 2. ΕΛΕΓΧΟΣ ΓΙΑ ΤΟ ΧΡΕΟΣ:
-                                # Αν είναι 1η του μήνα (εκτός Αυγούστου), ενημερώνονται όλοι (συμπεριλαμβανομένων κλειστών αν χρειάζεται).
-                                # ΑΛΛΙΩΣ, ενημερώνουμε το χρέος κανονικά βάσει παρουσιών ΜΟΝΟ για όσους ΔΕΝ είναι κλειστή πληρωμή.
+                                # 2. ΕΛΕΓΧΟΣ ΟΙΚΟΝΟΜΙΚΩΝ (Χωρίς καθυστερήσεις / με χρήση του ήδη φορτωμένου regs_df)
                                 is_first_of_month = (selected_date_obj.day == 1 and selected_date_obj.month != 8)
 
-                                regs_all_vals = sh.worksheet("db_registrations").get_all_values()
-                                reg_head = [str(c).strip() for c in regs_all_vals[0]]
-                                energy_idx = reg_head.index('energy') if 'energy' in reg_head else 10
-
                                 for c_id, prog_name in updated_customers:
-                                    # Βρίσκουμε τον μαθητή για να δούμε αν είναι κλειστή πληρωμή
+                                    # Ελέγχουμε γρήγορα από το regs_df αν ο μαθητής έχει κλειστή πληρωμή
+                                    student_reg = regs_df[
+                                        (regs_df['id_customer'].astype(str).str.strip() == str(c_id)) & 
+                                        (regs_df['school_year'].astype(str).str.strip() == str(selected_year_att))
+                                    ]
+                                    
                                     is_closed = False
-                                    for r_row in regs_all_vals[1:]:
-                                        if str(r_row[reg_head.index('id_customer') if 'id_customer' in reg_head else 1]).strip() == str(c_id) and \
-                                           str(r_row[reg_head.index('school_year') if 'school_year' in reg_head else 4]).strip() == str(selected_year_att):
-                                            e_val = str(r_row[energy_idx]).strip().lower() if len(r_row) > energy_idx else ""
-                                            if "κλειστή πληρωμή" in e_val or "κλειστη πληρωμη" in e_val:
-                                                is_closed = True
-                                            break
+                                    if not student_reg.empty and 'energy' in student_reg.columns:
+                                        e_val = str(student_reg.iloc[0]['energy']).strip().lower()
+                                        if "κλειστή πληρωμή" in e_val or "κλειστη πληρωμη" in e_val:
+                                            is_closed = True
 
-                                    # Αν είναι κλειστή πληρωμή, το χρέος αλλάζει ΜΟΝΟ την 1η του μήνα. 
-                                    # Αν είναι ανοιχτή πληρωμή, ενημερώνεται ΚΑΘΕ ΦΟΡΑ που μπαίνει/φεύγει παρουσία.
+                                    # Αν είναι ανοιχτή πληρωμή (ή είναι 1η του μήνα για κλειστή), ενημερώνουμε το χρέος
                                     if not is_closed or is_first_of_month:
                                         update_customer_xreos(c_id, selected_year_att, prog_name)
 
-                                st.success("✅ Το παρουσιολόγιο και τα οικονομικά ενημερώθηκαν επιτυχώς!")
-                                time.sleep(0.8)
+                                st.success("✅ Το παρουσιολόγιο αποθηκεύτηκε στιγμιαία και τα οικονομικά ενημερώθηκαν!")
+                                time.sleep(0.5)
                                 st.rerun()
                                 
                             except Exception as e:
@@ -774,6 +769,7 @@ else:
                         file_name=f"parousiologio_{target_date_str}.pdf",
                         mime="application/pdf"
                     )
+                    
     # --- ΣΕΛΙΔΑ: ΕΙΣΑΓΩΓΗ ΣΕ ΤΜΗΜΑ ---
     elif st.session_state.page == "renew_registration":
         if st.button("⬅️ Μενού", use_container_width=True): 
