@@ -576,12 +576,23 @@ else:
         target_date_str = selected_date_obj.strftime('%Y-%m-%d')
         st.info(f"Επιλεγμένη Ημερομηνία Καταγραφής: **{target_date_str}** | Σχολικό Έτος: **{selected_year_att}**")
 
-        regs_df = load_specific_db("db_registrations")
-        cust_df = load_specific_db("db_customers")
-        att_df = load_specific_db("db_attendances")
+        # Ασφαλής φόρτωση με μηχανισμό επανάληψης (retry) για αποφυγή καθυστερήσεων του Google Sheets
+        max_retries = 3
+        regs_df, cust_df, att_df = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+        for attempt in range(max_retries):
+            regs_df = load_specific_db("db_registrations")
+            cust_df = load_specific_db("db_customers")
+            att_df = load_specific_db("db_attendances")
+            
+            if not regs_df.empty and not cust_df.empty:
+                break
+            time.sleep(0.5)
 
         if regs_df.empty or cust_df.empty:
-            st.warning("⚠️ Δεν βρέθηκαν δεδομένα εγγραφών ή πελατών.")
+            st.warning("⏳ Γίνεται συγχρονισμός δεδομένων από το Google Sheets, παρακαλώ περιμένετε...")
+            time.sleep(1)
+            st.rerun()
         else:
             regs_df.columns = regs_df.columns.astype(str).str.strip()
             cust_df.columns = cust_df.columns.astype(str).str.strip()
