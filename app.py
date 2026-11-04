@@ -651,7 +651,7 @@ else:
                         reg_row_index = idx + 2
 
                         attendance_inputs[c_id] = {
-                            'val': val,
+                            'val': "ΝΑΙ" if val else "ΟΧΙ",
                             'reg_row_index': reg_row_index,
                             'adj_cost': adj_cost_val,
                             'prog': prog_name,
@@ -714,7 +714,6 @@ else:
                                         if key in existing_dict:
                                             # Υπάρχει ήδη, ενημερώνουμε το status αν χρειάζεται
                                             r_idx = existing_dict[key]
-                                            # Ελέγχουμε αν η τρέχουσα τιμή είναι διαφορετική από "ΝΑΙ"
                                             rows_to_update.append((r_idx, "ΝΑΙ"))
                                         else:
                                             # Δεν υπάρχει, προσθήκη νέας γραμμής
@@ -756,7 +755,7 @@ else:
                                 
                             except Exception as e:
                                 st.error(f"Σφάλμα αποθήκευσης παρουσιών: {e}")
-                                
+                
                 st.markdown("<br>", unsafe_allow_html=True)
                 pdf_bytes = generate_single_attendance_pdf(pdf_preview_rows, target_date_str, selected_year_att)
                 if pdf_bytes:
@@ -766,7 +765,6 @@ else:
                         file_name=f"parousiologio_{target_date_str}.pdf",
                         mime="application/pdf"
                     )
-
     # --- ΣΕΛΙΔΑ: ΕΙΣΑΓΩΓΗ ΣΕ ΤΜΗΜΑ ---
     elif st.session_state.page == "renew_registration":
         if st.button("⬅️ Μενού", use_container_width=True): 
