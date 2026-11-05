@@ -578,8 +578,7 @@ else:
             
             priv_regs = regs_df[
                 (regs_df['class'].astype(str).str.strip().str.lower() == 'ιδιωτικά') & 
-                (regs_df['school_year'].astype(str).str.strip() == selected_year_att) &
-                # (regs_df['id_customer'].astype(str).str.strip() != '213')
+                (regs_df['school_year'].astype(str).str.strip() == selected_year_att) 
             ].copy()
 
             if priv_regs.empty:
