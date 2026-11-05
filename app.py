@@ -1536,7 +1536,7 @@ else:
         with st.form("withdrawal_form"):
             w_date = st.date_input("📅 Ημερομηνία Ανάληψης", value=datetime.today())
             w_year = st.selectbox("📅 Σχολικό Έτος", options=["2026-2027", "2027-2028", "2028-2029", "2029-2030"])
-            w_amt = st.number_input("💶 Πσό Ανάληψης (€)", min_value=0.0, format="%.2f")
+            w_amt = st.number_input("💶 Ποσό Ανάληψης (€)", min_value=0.0, format="%.2f")
             w_desc = st.text_input("📝 Περιγραφή / Σημειώσεις (π.χ. Άφησα 250€ στο ταμείο)").strip()
 
             if st.form_submit_button("💾 Αποθήκευση Ανάληψης"):
@@ -1566,35 +1566,36 @@ else:
 
         st.markdown("---")
         st.subheader("📋 Ιστορικό Αναλήψεων Ταμείου")
+        
+        # Υπολογισμός συνολικού ποσού ανεξάρτητα από το αν θα εμφανιστεί ο πίνακας
+        total_withdrawals = 0.0
+        w_df = pd.DataFrame()
         try:
             gc = get_gspread_client()
             w_df = pd.DataFrame(gc.open(OLD_SHEET_NAME).worksheet("db_withdrawals").get_all_records())
             if not w_df.empty:
                 w_df.columns = w_df.columns.astype(str).str.strip()
-                
-                # Υπολογισμός και καθαρισμός ποσών για το συνολικό άθροισμα
                 if 'amount' in w_df.columns:
-                    w_df['amount_numeric'] = pd.to_numeric(
+                    total_withdrawals = pd.to_numeric(
                         w_df['amount'].astype(str).str.replace('€', '').str.replace(',', '.').str.strip(), 
                         errors='coerce'
-                    ).fillna(0.0)
-                    total_withdrawals = w_df['amount_numeric'].sum()
-                    
-                    # Εμφάνιση Συνολικού Ποσού Αναλήψεων με Metric
-                    formatted_total_w = f"{total_withdrawals:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.')
-                    st.metric(label="📊 **Συνολικό Πσό Αναλήψεων:**", value=formatted_total_w)
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    
-                    # Καθαρισμός βοηθητικής στήλης πριν την εμφάνιση στον πίνακα
-                    w_df_display = w_df.drop(columns=['amount_numeric'])
-                else:
-                    w_df_display = w_df
-
-                st.dataframe(w_df_display, use_container_width=True, hide_index=True)
-            else:
-                st.info("Δεν υπάρχουν καταχωρημένες αναλήψεις ταμείου.")
+                    ).fillna(0.0).sum()
         except:
-            st.info("Δεν βρέθηκε το φύλλο db_withdrawals ή είναι κενό.")
+            pass
+
+        # Εμφάνιση του Metric σταθερά στην οθόνη
+        formatted_total_w = f"{total_withdrawals:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.')
+        st.metric(label="📊 **Συνολικό Ποσό Αναλήψεων:**", value=formatted_total_w)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Εμφάνιση πίνακα ή μηνύματος
+        if not w_df.empty:
+            w_df_display = w_df.copy()
+            if 'amount_numeric' in w_df_display.columns:
+                w_df_display = w_df_display.drop(columns=['amount_numeric'])
+            st.dataframe(w_df_display, use_container_width=True, hide_index=True)
+        else:
+            st.info("Δεν υπάρχουν καταχωρημένες αναλήψεις ταμείου.")
 
     elif st.session_state.page == "corp_payments_report":
         if st.button("⬅️ Μενού", use_container_width=True): 
