@@ -1928,6 +1928,155 @@ else:
                         display_comp_df = student_comps.drop(columns=[c for c in ['id_complaint', 'id_customer', 'customer_firstname', 'customer_lastname'] if c in student_comps.columns]).rename(columns=renames_h)
                         st.dataframe(display_comp_df, use_container_width=True, hide_index=True)
 
+    elif st.session_state.page == "db_final_page":
+        if st.button("⬅️ Μενού", use_container_width=True): 
+            st.session_state.page = "menu"
+            st.rerun() 
+        
+        st.subheader("📊 Συνολική Οικονομική Επισκόπηση & Ταμείο")
+        st.write("Αυτή η σελίδα υπολογίζει αυτόματα την εικόνα του ταμείου σας διαβάζοντας τις πληρωμές, τα έξοδα και τις αναλήψεις.")
+        
+        # Φόρτωση δεδομένων από τα 3 βασικά φύλλα
+        pays_df = load_specific_db("db_payments")
+        
+        try:
+            gc = get_gspread_client()
+            sh_exp = gc.open(OLD_SHEET_NAME).worksheet("db_payments_company")
+            exp_df = pd.DataFrame(sh_exp.get_all_records())
+        except:
+            exp_df = pd.DataFrame()
+
+        try:
+            sh_w = gc.open(OLD_SHEET_NAME).worksheet("db_withdrawals")
+            withdrawals_df = pd.DataFrame(sh_w.get_all_records())
+        except:
+            withdrawals_df = pd.DataFrame()
+
+        income_records = []
+        if not pays_df.empty:
+            pays_df.columns = pays_df.columns.astype(str).str.strip()
+            for _, r in pays_df.iterrows():
+                p_date = str(r.get('payment_date', '')).strip()
+                raw_amt = str(r.get('amount_paid', 0)).replace('€', '').replace(',', '.').strip()
+                try: amt = float(raw_amt)
+                except: amt = 0.0
+                cust_name = f"{r.get('customer_lastname', '')} {r.get('customer_firstname', '')}".strip()
+                
+                if p_date and amt > 0:
+                    income_records.append({
+                        'date': p_date,
+                        'month_year': p_date[:7] if len(p_date) >= 7 else 'Άγνωστο',
+                        'type': 'Έσοδο',
+                        'description': f"Πληρωμή συνδρομής: {cust_name}",
+                        'income': amt,
+                        'expense': 0.0,
+                        'withdrawal': 0.0
+                    })
+
+        expense_records = []
+        if not exp_df.empty:
+            exp_df.columns = exp_df.columns.astype(str).str.strip()
+            for _, r in exp_df.iterrows():
+                e_date = str(r.get('payment_date', '')).strip() or str(r.get('entry_date', '')).strip()
+                raw_amt = str(r.get('amount', 0)).replace('€', '').replace(',', '.').strip()
+                try: amt = float(raw_amt)
+                except: amt = 0.0
+                comp_name = str(r.get('company_name', '')).strip()
+                
+                if e_date and amt > 0:
+                    expense_records.append({
+                        'date': e_date,
+                        'month_year': e_date[:7] if len(e_date) >= 7 else 'Άγνωστο',
+                        'type': f"Έξοδος ({comp_name})",
+                        'description': f"Έξοδος Επιχείρησης: {comp_name}",
+                        'income': 0.0,
+                        'expense': amt,
+                        'withdrawal': 0.0
+                    })
+
+        withdrawal_records = []
+        if not withdrawals_df.empty:
+            withdrawals_df.columns = withdrawals_df.columns.astype(str).str.strip()
+            for _, r in withdrawals_df.iterrows():
+                w_date = str(r.get('withdrawal_date', '')).strip()
+                raw_amt = str(r.get('amount', 0)).replace('€', '').replace(',', '.').strip()
+                try: amt = float(raw_amt)
+                except: amt = 0.0
+                w_desc = str(r.get('description', '')).strip()
+
+                if w_date and amt > 0:
+                    withdrawal_records.append({
+                        'date': w_date,
+                        'month_year': w_date[:7] if len(w_date) >= 7 else 'Άγνωστο',
+                        'type': 'Ανάληψη Ταμείου',
+                        'description': f"Ανάληψη: {w_desc}" if w_desc else "Ανάληψη Ταμείου",
+                        'income': 0.0,
+                        'expense': 0.0,
+                        'withdrawal': amt
+                    })
+
+        all_records = income_records + expense_records + withdrawal_records
+        if not all_records:
+            st.info("Δεν βρέθηκαν οικονομικές κινήσεις.")
+        else:
+            unified_df = pd.DataFrame(all_records)
+            unified_df = unified_df.sort_values(by='date', ascending=True)
+
+            # Υπολογισμός καθαρής ταμειακής ροής
+            unified_df['net'] = unified_df['income'] - unified_df['expense'] - unified_df['withdrawal']
+            unified_df['running_drawer'] = unified_df['net'].cumsum()
+
+            available_months = ["ΟΛΑ"] + sorted(unified_df['month_year'].unique().tolist(), reverse=True)
+            sel_month = st.selectbox("📅 Φίλτρο ανά Μήνα (YYYY-MM)", options=available_months)
+
+            filtered_df = unified_df.copy()
+            opening_balance = 0.0
+            
+            if sel_month != "ΟΛΑ":
+                prior_df = unified_df[unified_df['month_year'] < sel_month]
+                if not prior_df.empty:
+                    opening_balance = prior_df['net'].sum()
+                
+                filtered_df = unified_df[unified_df['month_year'] == sel_month]
+
+            st.markdown(f"**Συνολικές Κινήσεις περιόδου:** {len(filtered_df)}")
+            
+            display_df = filtered_df.copy()
+            display_df['income'] = display_df['income'].apply(lambda x: f"{x:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
+            display_df['expense'] = display_df['expense'].apply(lambda x: f"{x:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
+            display_df['withdrawal'] = display_df['withdrawal'].apply(lambda x: f"{x:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
+            
+            renames = {
+                'date': 'Ημερομηνία',
+                'month_year': 'Μήνας',
+                'type': 'Κατηγορία',
+                'description': 'Περιγραφή',
+                'income': 'Έσοδα (+)',
+                'expense': 'Έξοδος (-)',
+                'withdrawal': 'Ανάληψη (-)'
+            }
+            display_df = display_df.rename(columns=renames)
+            
+            st.dataframe(display_df[['Ημερομηνία', 'Κατηγορία', 'Περιγραφή', 'Έσοδα (+)', 'Έξοδος (-)', 'Ανάληψη (-)']], use_container_width=True, hide_index=True)
+
+            period_inc = filtered_df['income'].sum()
+            period_exp = filtered_df['expense'].sum()
+            period_with = filtered_df['withdrawal'].sum()
+            period_net = period_inc - period_exp - period_with
+            
+            total_drawer_balance = opening_balance + period_net if sel_month != "ΟΛΑ" else unified_df['running_drawer'].iloc[-1] if not unified_df.empty else 0.0
+
+            st.divider()
+            
+            if sel_month != "ΟΛΑ":
+                st.info(f"📌 **Άνοιγμα Ταμείου (από προηγούμενους μήνες):** `{opening_balance:,.2f} €`".replace(',', 'X').replace('.', ',').replace('X', '.'))
+
+            col_s1, col_s2, col_s3 = st.columns(3)
+            col_s1.metric(label="📈 Έσοδα:", value=f"{period_inc:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
+            col_s2.metric(label="📉 Έξοδα & Αναλήψεις", value=f"{(period_exp + period_with):,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
+            col_s3.metric(label="💰 Ταμείο (Συρτάρι)", value=f"{total_drawer_balance:,.2f} €".replace(',', 'X').replace('.', ',').replace('X', '.'))
+    
+    
     elif st.session_state.page == "corp_suppliers_page":
         if st.button("⬅️ Μενού", use_container_width=True): 
             st.session_state.page = "menu"
